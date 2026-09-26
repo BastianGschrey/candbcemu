@@ -1,0 +1,394 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: Haltech_ECU
+
+
+BO_ 864 ID_0x360: 8 Haltech_ECU
+ SG_ Engine_Speed : 7|16@0+ (1,0) [0|65535] "RPM" Vector__XXX
+ SG_ Manifold_Pressure : 23|16@0+ (0.1,0) [0|6553.5] "kilopascal" Vector__XXX
+ SG_ Throttle_Position : 39|16@0+ (0.1,0) [-3276.8|3276.7] "%" Vector__XXX
+ SG_ Coolant_Pressure : 55|16@0+ (0.1,-101.3) [-101.3|6452.2] "kilopascal" Vector__XXX
+
+BO_ 865 ID_0x361: 8 Haltech_ECU
+ SG_ Fuel_Pressure : 7|16@0+ (0.1,-101.3) [-101.3|6452.2] "kilopascal" Vector__XXX
+ SG_ Oil_Pressure : 23|16@0+ (0.1,-101.3) [-101.3|6452.2] "kilopascal" Vector__XXX
+ SG_ Engine_Demand : 39|16@0+ (0.1,0) [-3276.8|3276.7] "%" Vector__XXX
+ SG_ Wastegate_Pressure : 55|16@0+ (0.1,-101.3) [-101.3|6452.2] "kilopascal" Vector__XXX
+
+BO_ 866 ID_0x362: 6 Haltech_ECU
+ SG_ Inj_Stg_1_DC : 7|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Inj_Stg_2_DC : 23|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Ignition_Angle : 39|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+
+BO_ 867 ID_0x363: 4 Haltech_ECU
+ SG_ Wheel_Slip : 7|16@0- (0.1,0) [-3276.8|3276.7] "km/h" Vector__XXX
+ SG_ Wheel_Diff : 23|16@0- (0.1,0) [-3276.8|3276.7] "km/h" Vector__XXX
+
+BO_ 872 ID_0x368: 8 Haltech_ECU
+ SG_ Lambda_1 : 7|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_2 : 23|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_3 : 39|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_4 : 55|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+
+BO_ 873 ID_0x369: 8 Haltech_ECU
+ SG_ Trigger_System_Error_Count : 7|16@0+ (1,0) [0|65535] "none" Vector__XXX
+ SG_ Trigger_Counter : 23|16@0+ (1,0) [0|65535] "none" Vector__XXX
+ SG_ Trigger_Sync_Level : 55|16@0+ (1,0) [0|65535] "none" Vector__XXX
+
+BO_ 874 ID_0x36A: 4 Haltech_ECU
+ SG_ Knock_Level_1 : 7|16@0+ (0.01,0) [0|655.35] "dB" Vector__XXX
+ SG_ Knock_Level_2 : 23|16@0+ (0.01,0) [0|655.35] "dB" Vector__XXX
+
+BO_ 875 ID_0x36B: 8 Haltech_ECU
+ SG_ Brake_Pressure : 7|16@0+ (1,-101.3) [-101.3|65433.7] "kilopascal" Vector__XXX
+ SG_ No2_Pressure_Sensor_1 : 23|16@0+ (0.22,-101.3) [-101.3|14316.4] "kilopascal" Vector__XXX
+ SG_ Turbo_Speed_Sensor : 39|16@0+ (10,0) [0|655350] "RPM" Vector__XXX
+ SG_ Lateral_G : 55|16@0- (0.0101972,0) [-334.132|334.1316524] "G" Vector__XXX
+
+BO_ 876 ID_0x36C: 8 Haltech_ECU
+ SG_ Wheel_Speed_FL : 7|16@0+ (0.1,0) [0|6553.5] "km/h" Vector__XXX
+ SG_ Wheel_Speed_FR : 23|16@0+ (0.1,0) [0|6553.5] "km/h" Vector__XXX
+ SG_ Wheel_Speed_RL : 39|16@0+ (0.1,0) [0|6553.5] "km/h" Vector__XXX
+ SG_ Wheel_Speed_RR : 55|16@0+ (0.1,0) [0|6553.5] "km/h" Vector__XXX
+
+BO_ 877 ID_0x36D: 8 Haltech_ECU
+ SG_ Exh_Cam_Angle_1 : 39|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+ SG_ Exh_Cam_Angle_2 : 55|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+
+BO_ 878 ID_0x36E: 8 Haltech_ECU
+ SG_ Engine_Limiting_Active : 8|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Launch_Control_Ign_Retard : 23|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+ SG_ Launch_Control_Fuel_Enrich : 39|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+ SG_ Longitudinal_G : 55|16@0- (0.0101972,0) [-334.132|334.132] "G" Vector__XXX
+
+BO_ 879 ID_0x36F: 4 Haltech_ECU
+ SG_ Generic_Output_1_DC : 7|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Boost_Control_Output : 23|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+
+BO_ 880 ID_0x370: 8 Haltech_ECU
+ SG_ Vehicle_Speed : 7|16@0+ (0.1,0) [0|6553.5] "km/h" Vector__XXX
+ SG_ Int_Cam_Angle_1 : 39|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+ SG_ Int_Cam_Angle_2 : 55|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+
+BO_ 881 ID_0x371: 4 Haltech_ECU
+ SG_ Fuel_Flow : 7|16@0+ (0.0166667,0) [0|1092.2521845] "ml/s" Vector__XXX
+ SG_ Fuel_Flow_Return : 23|16@0+ (0.0166667,0) [0|1092.2521845] "ml/s" Vector__XXX
+
+BO_ 882 ID_0x372: 8 Haltech_ECU
+ SG_ Battery_Voltage : 7|16@0+ (0.1,0) [0|6553.5] "V" Vector__XXX
+ SG_ Target_Boost_Level : 39|16@0+ (0.1,0) [0|6553.5] "kilopascal" Vector__XXX
+ SG_ Barometric_Pressure : 55|16@0+ (0.1,0) [0|6553.5] "kilopascal" Vector__XXX
+
+BO_ 883 ID_0x373: 8 Haltech_ECU
+ SG_ EGT_1 : 7|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_2 : 23|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_3 : 39|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_4 : 55|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+
+BO_ 884 ID_0x374: 8 Haltech_ECU
+ SG_ EGT_5 : 7|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_6 : 23|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_7 : 39|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_8 : 55|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+
+BO_ 885 ID_0x375: 8 Haltech_ECU
+ SG_ EGT_9 : 7|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_10 : 23|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_11 : 39|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ EGT_12 : 55|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+
+BO_ 992 ID_0x3E0: 8 Haltech_ECU
+ SG_ Coolant_Temperature : 7|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ Air_Temperature : 23|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ Fuel_Temperature : 39|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ Oil_Temperature : 55|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+
+BO_ 993 ID_0x3E1: 6 Haltech_ECU
+ SG_ Gearbox_Oil_Temperature : 7|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ Diff_Oil_Temperature : 23|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ Fuel_Composition : 39|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+
+BO_ 994 ID_0x3E2: 2 Haltech_ECU
+ SG_ Fuel_Level : 7|16@0+ (0.1,0) [0|6553.5] "L" Vector__XXX
+
+BO_ 995 ID_0x3E3: 8 Haltech_ECU
+ SG_ STFT_Bank_1 : 7|16@0- (0.1,0) [-3276.8|3276.7] "%" Vector__XXX
+ SG_ STFT_Bank_2 : 23|16@0- (0.1,0) [-3276.8|3276.7] "%" Vector__XXX
+ SG_ LTFT_Bank_1 : 39|16@0- (0.1,0) [-3276.8|3276.7] "%" Vector__XXX
+ SG_ LTFT_Bank_2 : 55|16@0- (0.1,0) [-3276.8|3276.7] "%" Vector__XXX
+
+BO_ 996 ID_0x3E4: 8 Haltech_ECU
+ SG_ Gear_Switch : 5|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Decel_Cut_Active : 4|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Transient_Throttle_Active : 3|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Brake_Pedal_Switch : 2|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Clutch_Switch : 1|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Launch_Control_Active : 23|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Aux_RPM_Limiter_Active : 21|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Flat_Shift_Switch : 19|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Torque_Reduction_Active : 17|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Check_Engine_Light : 63|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Battery_Light_Active : 62|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Neutral_Switch : 7|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Reverse_Switch : 6|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Oil_Pressure_Light : 0|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Launch_Control_Switch : 22|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Traction_Control_Active : 31|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Traction_Control_Enabled : 30|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Aircon_Request : 29|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Aircon_Output : 28|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ ThermoFan_4_On : 27|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ ThermoFan_3_On : 26|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ ThermoFan_2_On : 25|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ ThermoFan_1_On : 24|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Rotary_Trimpot_1 : 39|8@0- (1,0) [0|65535] "none" Vector__XXX
+ SG_ Rotary_Trimpot_2 : 47|8@0- (1,0) [0|65535] "none" Vector__XXX
+ SG_ Rotary_Trimpot_3 : 55|8@0- (1,0) [0|65535] "none" Vector__XXX
+
+BO_ 997 ID_0x3E5: 8 Haltech_ECU
+ SG_ Ignition_Switch : 0|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Turbo_Timer_Sec_Remaining : 15|8@0+ (1,0) [0|255] "s" Vector__XXX
+ SG_ Turbo_Timer_Eng_Sec_Remaining : 23|8@0+ (1,0) [0|255] "s" Vector__XXX
+ SG_ Steering_Wheel_Angle : 39|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+ SG_ Driveshaft_RPM : 55|16@0+ (1,0) [0|65535] "RPM" Vector__XXX
+
+BO_ 998 ID_0x3E6: 8 Haltech_ECU
+ SG_ No2_Pressure_Sensor_2 : 7|16@0+ (0.22,-101.3) [-101.3|14316.4] "kilopascal" Vector__XXX
+ SG_ No2_Pressure_Sensor_3 : 23|16@0+ (0.22,-101.3) [-101.3|14316.4] "kilopascal" Vector__XXX
+ SG_ No2_Pressure_Sensor_4 : 39|16@0+ (0.22,-101.3) [-101.3|14316.4] "kilopascal" Vector__XXX
+ SG_ Turbo_Speed_Sensor_2 : 55|16@0+ (0.1,0) [0|655350] "RPM" Vector__XXX
+
+BO_ 999 ID_0x3E7: 8 Haltech_ECU
+ SG_ Generic_Sensor_1 : 7|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Generic_Sensor_2 : 23|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Generic_Sensor_3 : 39|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Generic_Sensor_4 : 55|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+
+BO_ 1000 ID_0x3E8: 8 Haltech_ECU
+ SG_ Generic_Sensor_5 : 7|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Generic_Sensor_6 : 23|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Generic_Sensor_7 : 39|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Generic_Sensor_8 : 55|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+
+BO_ 1001 ID_0x3E9: 8 Haltech_ECU
+ SG_ Generic_Sensor_9 : 7|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Generic_Sensor_10 : 23|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Target_Lamnda : 39|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Nitrous_Stsge_1_Output : 55|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Nitrous_Stage_2_Outout : 54|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Nitrous_Stage_3_Output : 53|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Nitrous_Stage_4_Outout : 52|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Nitrous_Stage_5_Outout : 51|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ Nitrous_Stage_6_Output : 50|1@0+ (1,0) [0|1] "Off/On" Vector__XXX
+ SG_ TqMgmt_Knob : 63|8@0- (1,0) [0|255] "unitless" Vector__XXX
+
+BO_ 1002 ID_0x3EA: 8 Haltech_ECU
+ SG_ Gearbox_Oil_Pressure : 7|16@0+ (0.1,-101.3) [-101.3|6452.2] "kilopascal" Vector__XXX
+ SG_ Inj_Stage_3_DC : 23|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Inj_Stage_4_DC : 39|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Crankcase_Pressure : 55|16@0+ (0.1,-101.3) [-101.3|6452.2] "kilopascal" Vector__XXX
+
+BO_ 1003 ID_0x3EB: 8 Haltech_ECU
+ SG_ Race_Timer : 7|32@0+ (1,0) [0|9999999] "ms" Vector__XXX
+ SG_ Ignition_Angle_Bank_1 : 39|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+ SG_ Ignition_Angle_Bank_2 : 55|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+
+BO_ 1004 ID_0x3EC: 8 Haltech_ECU
+ SG_ TqMgmt_DS_Target : 7|16@0- (1,0) [-32768|32767] "RPM" Vector__XXX
+ SG_ TqMgmt_DS_Error : 23|16@0- (1,0) [-32768|32767] "RPM" Vector__XXX
+ SG_ TqMgmt_DS_Target_Err_Ign_Corr : 39|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+ SG_ TqMgmt_DS_Timed_Ign_Corr : 55|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+
+BO_ 1005 ID_0x3ED: 2 Haltech_ECU
+ SG_ TqMgmt_Combined_Ign_Corr : 7|16@0- (0.1,0) [-3276.8|3276.7] "Degree" Vector__XXX
+
+BO_ 886 ID_0x376: 8 Haltech_ECU
+ SG_ Ambient_Air_Temperature : 7|16@0+ (0.1,0) [0|6553.5] "Kelvin" Vector__XXX
+ SG_ Relative_Humidity : 23|16@0- (0.1,0) [0|6553.5] "%" Vector__XXX
+ SG_ Specific_Humidity : 39|16@0+ (100,0) [0|6553500] "ppm" Vector__XXX
+ SG_ Absolute_Humidity : 55|16@0+ (0.1,0) [0|6553.5] "g/m3" Vector__XXX
+
+BO_ 1006 ID_0x3EE: 8 Haltech_ECU
+ SG_ Lambda_5 : 7|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_6 : 23|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_7 : 39|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_8 : 55|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+
+BO_ 1007 ID_0x3EF: 8 Haltech_ECU
+ SG_ Lambda_9 : 7|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_10 : 23|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_11 : 39|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_12 : 55|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+
+BO_ 1136 ID_0x470: 8 Haltech_ECU
+ SG_ Lambda_Overall : 7|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_Bank_1 : 23|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Lambda_Bank_2 : 39|16@0+ (0.001,0) [0|65.535] "Lambda" Vector__XXX
+ SG_ Gear_Selector_Position : 55|8@0- (1,0) [-128|127] "enumeration" Vector__XXX
+ SG_ Gear : 63|8@0- (1,0) [-1|6] "enumeration" Vector__XXX
+
+BO_ 1137 ID_0x471: 4 Haltech_ECU
+ SG_ Inj_Differential_Pressure : 7|16@0- (0.1,0) [-3276.8|3276.7] "kilopascal" Vector__XXX
+ SG_ Accel_Pedal_Position : 23|16@0+ (0.1,0) [0|6553.5] "%" Vector__XXX
+
+BO_ 1138 ID_0x472: 8 Haltech_ECU
+ SG_ Cruise_Target : 7|16@0+ (0.1,0) [0|6553.5] "km/h" Vector__XXX
+ SG_ Cruise_Last_Target : 23|16@0+ (0.1,0) [0|6553.5] "km/h" Vector__XXX
+ SG_ Cruise_Error : 39|16@0+ (0.1,0) [0|6553.5] "km/h" Vector__XXX
+ SG_ Cruise_Controller_State : 55|4@0+ (1,0) [0|4] "enumeration" Vector__XXX
+ SG_ Cruise_Input_State : 51|12@0+ (1,0) [0|512] "enumeration" Vector__XXX
+
+
+
+CM_ BO_ 864 "0x360 50Hz 
+0 - 1 Unsigned RPM RPM y = x 
+2 - 3 Unsigned Manifold Pressure kPa (Abs ) y = x/10 
+4 - 5 Unsigned Throttle Position % y = x/10 
+6 - 7 Unsigned Coolant Pressure kPa y = x/10 - 101.3";
+CM_ BO_ 865 "0x361 50Hz 
+0 - 1 Unsigned Fuel Pressure kPa y = x/10 - 101.3 
+2 - 3 Unsigned Oil Pressure kPa y = x/10 - 101.3 
+4 - 5 Unsigned Engine Demand % y = x/10 
+6 - 7 Unsigned Wastegate Pressure kPa y = x/10 - 101.3";
+CM_ BO_ 866 "0x362 50 Hz 
+0 - 1 Unsigned Injection Stage 1 Duty Cycle % y = x/10 
+2 - 3 Unsigned Injection Stage 2 Duty Cycle % y = x/10 
+4 - 5 Signed Ignition Angle (Leading) � y = x/10";
+CM_ BO_ 867 "0x363 20Hz 
+0 - 1 Signed Wheel Slip km/h y = x/10 
+2 - 3 Signed Wheel Diff km/h y = x/10";
+CM_ BO_ 872 "0x368 20Hz 
+0 - 1 Unsigned Wideband Sensor 1 (Lambda) y = x/1000 
+2 - 3 Unsigned Wideband Sensor 2 (Lambda) y = x/1000 
+4 - 5 Unsigned Wideband Sensor 3 (Lambda) y = x/1000 
+6 - 7 Unsigned Wideband Sensor 4 (Lambda) y = x/1000 ";
+CM_ BO_ 873 "0x369 20Hz 
+0 - 1 Unsigned Trigger System Error Count raw y = x 
+2 - 3 Unsigned Trigger Counter raw y = x 
+6 - 7 Unsigned Trigger Sync Level raw y = x";
+CM_ BO_ 874 "0x36A 20Hz 
+0 - 1 Unsigned Knock Level 1 dB y = x/100 
+2 - 3 Unsigned Knock Level 2 dB y = x/100";
+CM_ BO_ 875 "0x36B 20Hz 
+0 - 1 Unsigned Brake Pressure kPa y = x-101.3 
+2 - 3 Unsigned NOS Pressure Sensor 1 kPa y = x*11/50-101.3 
+4 - 5 Unsigned Turbo Speed Sensor 1 RPM y = x*10 
+6 - 7 Signed Lateral G m/s2 y = x/1 0";
+CM_ BO_ 876 "0x36C 20Hz 
+0 - 1 Unsigned Wheel Speed Front Left km/h y = x/10 
+2 - 3 Unsigned Wheel Speed Front Right km/h y = x/10 
+4 - 5 Unsigned Wheel Speed Rear Left km/h y = x/10 
+6 - 7 Unsigned Wheel Speed Rear Right km/h y = x/10";
+CM_ BO_ 877 "0x36D 20hz 
+4 - 5 Sig n e d E x h a u s t C a m A n gle 1 � y = x / 1 0 6 - 7 Sig n e d E x h a u s t C a m A n gle 2 � y = x / 1 0";
+CM_ BO_ 878 "0x36E 20Hz 
+0 - 1 U n sig n e d E n gin e Limitin g A c tiv e r a w y := 0 = O f f , 1 = O n 2 - 3 Sig n e d L a u n c h C o n t r ol Ignition Retard � y = x / 1 0 4 - 5 Sig n e d L a u n c h C o n t r ol Fuel En ric h % y = x / 1 0 6 - 7 Sig n e d L o n git u din al G m / s 2 y = x / 1 0";
+CM_ BO_ 879 "0x36F 20Hz 
+U n sig n e d G e n e ric O u t p u t 1 D u t y C y cle % y = x / 1 0 2 - 3 U n sig n e d B o o s t C o n t r ol Output % y = x / 1 0";
+CM_ BO_ 880 "0x370 20Hz 
+0 - 1 U n sig n e d V e hicle S p e e d k m / h y = x / 1 0 4 - 5 Sig n e d In t a k e C a m A n gle 1 � y = x / 1 0 6 - 7 Sig n e d In t a k e C a m A n gle 2 � y = x / 1 0";
+CM_ BO_ 881 "0x371 10Hz 
+0 - 1 U n sig n e d F u el Flo w c c / m in y = x 2 - 3 U n sig n e d F u el Flo w R e t u r n c c / m in y = x";
+CM_ BO_ 882 "0x372 10Hz 
+0 - 1 U n sig n e d B a t t e r y V olt a g e V olt s y = x / 1 0 4 - 5 U n sig n e d T a r g e t B o o s t L e v el k P a y = x / 1 0 6 - 7 U n sig n e d B a r o m e t ric P r e s s u r e k P a ( A b s ) y = x / 1 0";
+CM_ BO_ 883 "0x373 10Hz 
+0 - 1 U n sig n e d E G T S e n s o r 1 K y = x / 1 0 2 - 3 U n sig n e d E G T S e n s o r 2 K y = x / 1 0 4 - 5 U n sig n e d E G T S e n s o r 3 K y = x / 1 0 6 - 7 U n sig n e d E G T S e n s o r 4 K y = x / 1 0";
+CM_ BO_ 884 "0x374 10Hz 
+0 - 1 U n sig n e d E G T S e n s o r 5 K y = x / 1 0 2 - 3 U n sig n e d E G T S e n s o r 6 K y = x / 1 0 4 - 5 U n sig n e d E G T S e n s o r 7 K y = x / 1 0 6 - 7 U n sig n e d E G T S e n s o r 8 K y = x / 1 0";
+CM_ BO_ 885 "0x375 10Hz 
+0 - 1 U n sig n e d E G T S e n s o r 9 K y = x / 1 0 2 - 3 U n sig n e d E G T S e n s o r 1 0 K y = x / 1 0 4 - 5 U n sig n e d E G T S e n s o r 1 1 K y = x / 1 0 6 - 7 U n sig n e d E G T S e n s o r 1 2 K y = x / 1 0";
+CM_ BO_ 992 "0x3E0 5Hz 
+0 - 1 U n sig n e d C o ola n t T e m p e r a t u r e K y = x / 1 0 2 - 3 U n sig n e d Air Tem p e r a t u r e K y = x / 1 0 4 - 5 U n sig n e d F u el Tem p e r a t u r e K y = x / 1 0 6 - 7 U n sig n e d Oil Te m p e r a t u r e K y = x / 1 0";
+CM_ BO_ 993 "0x3E1 5Hz 
+0 - 1 U n sig n e d G e a r b o x Oil Te m p e r a t u r e K y = x / 1 0 2 - 3 U n sig n e d Dif f Oil Tempe r a t u r e K y = x / 1 0 4 - 5 U n sig n e d F u el Com p o siti on % y = x / 1 0";
+CM_ BO_ 994 "0x3E2 5Hz 
+0 - 1 U n sig n e d F u el L e v el L y = x / 1 0";
+CM_ BO_ 995 "0x3E3 5Hz 0 - 1 Sig n e d F u el T rim S h o r t T e r m B a n k 1 % y = x / 1 0 2 - 3 Sig n e d F u el T rim S h o r t T e r m B a n k 2 % y = x / 1 0 4 - 5 Sig n e d F u el T rim L o n g T e r m B a n k 1 % y = x / 1 0 6 - 7 Sig n e d F u el T rim L o n g T e r m B a n k 2 % y = x / 1 0";
+CM_ BO_ 996 "0x3E4 5Hz 
+1:7 U n sig n e d N e u t r al Switch e n u m y := 0 = O f f , 1 = O n 1:6 U n sig n e d R e v e r s e S wit c h e n u m y := 0 = O f f , 1 = O n 1:5 U n sig n e d G e a r S wit c h e n u m y := 0 = O f f , 1 = O n 1:4 U n sig n e d D e c el C u t A c tiv e e n u m y := 0 = O f f , 1 = O n 1:3 U n sig n e d T r a n sie n t T h r o t tle A c tiv e e n u m y := 0 = O f f , 1 = O n 1:2 U n sig n e d B r a k e P e d al Switc h e n u m y := 0 = O f f , 1 = O n 1:1 U n sig n e d Clu t c h S wit c h e n u m y := 0 = O f f , 1 = O n 1:0 Unsign ed Oil Pressure Light enu m y := 0=Off,1=On 2:7 Unsign ed Launch Control Active enu m y := 0=Off,1=On 2:6 Unsign ed Launch Control Switch enu m y := 0=Off,1=On 2:5 Unsign ed Aux RPM Limiter Active enu m y := 0=Off,1=On 2:3 Unsign ed Flat Shift Switch enu m y := 0=Off,1=On 2:1 Unsign ed Torque Reduction Active enu m y := 0=Off,1=On 3:7 Unsign ed Traction Control Active enu m y := 0=Off,1=On 3:6 Unsign ed Traction Control Enabled enu m y := 0=O";
+CM_ BO_ 997 "0x3E5 50Hz 
+0 U n sig n e d Ig nitio n S wit c h e n u m y := 0 = O f f , 1 = O n 1 U n sig n e d T u r b o Tim e r - Tim e R e m ainin g s y = x 2 U n sig n e d T u r b o Tim e r - E n gin e Tim e R e m ainin g s y = x 4 - 5 Sig n e d S t e e rin g W h e el Angle � y = x / 1 0 6 - 7 U n sig n e d D riv e s h a f t R P M R P M y = x";
+CM_ BO_ 998 "0x3E6 20Hz 
+0 - 1 U n sig n e d N O S P r e s s u r e S e n s o r 2 k P a y = x * 1 1 / 5 0 - 1 0 1.3 2 - 3 U n sig n e d N O S P r e s s u r e S e n s o r 3 k P a y = x * 1 1 / 5 0 - 1 0 1.3 4 - 5 U n sig n e d N O S P r e s s u r e S e n s o r 4 k P a y = x * 1 1 / 5 0 - 1 0 1.3 6 - 7 U n sig n e d T u r b o S p e e d S e n s o r 2 R P M y = x * 1 0";
+CM_ BO_ 999 "0x3E7 20Hz 
+0 - 1 U n sig n e d G e n e ric S e n s o r 1 % y = x / 1 0 2 - 3 U n sig n e d G e n e ric S e n s o r 2 % y = x / 1 0 4 - 5 U n sig n e d G e n e ric S e n s o r 3 % y = x / 1 0 6 - 7 U n sig n e d G e n e ric S e n s o r 4 % y = x / 1 0";
+CM_ BO_ 1000 "0x3E8 20Hz 
+0 - 1 U n sig n e d G e n e ric S e n s o r 5 % y = x / 1 0 2 - 3 U n sig n e d G e n e ric S e n s o r 6 % y = x / 1 0 4 - 5 U n sig n e d G e n e ric S e n s o r 7 % y = x / 1 0 6 - 7 U n sig n e d G e n e ric S e n s o r 8 % y = x / 1 0";
+CM_ BO_ 1001 "0x3E9 20Hz 
+0 - 1 U n sig n e d G e n e ric S e n s o r 9 % y = x / 1 0 2 - 3 U n sig n e d G e n e ric S e n s o r 1 0 % y = x / 1 0 4 - 5 U n sig n e d T a r g e t L a m b d a ? y = x / 1 0 0 0 6:7 U n sig n e d Nit r o u s S t a g e 1 O u t p u t S t a t e e n u m y := 0 = O f f , 1 = O n 6:6 U n sig n e d Nit r o u s S t a g e 2 O u t p u t S t a t e e n u m y := 0 = O f f , 1 = O n 6:5 U n sig n e d Nit r o u s S t a g e 3 O u t p u t S t a t e e n u m y := 0 = O f f , 1 = O n 6:4 U n sig n e d Nit r o u s S t a g e 4 O u t p u t S t a t e e n u m y := 0 = O f f , 1 = O n 6:3 U n sig n e d Nit r o u s S t a g e 5 O u t p u t S t a t e e n u m y := 0 = O f f , 1 = O n 6:2 U n sig n e d Nit r o u s S t a g e 6 O u t p u t S t a t e e n u m y := 0 = O f f , 1 = O n 7 Sig n e d T o r q u e M a n a g e m e n t K n o b r a w y = x";
+CM_ BO_ 1002 "0x3EA 50Hz 
+0 - 1 U n sig n e d G e a r b o x Lin e P r e s s u r e k P a y = x / 1 0 - 1 0 1.3 2 - 3 U n sig n e d In j e c tio n S t a g e 3 D u t y C y cle % y = x / 1 0 4 - 5 U n sig n e d In j e c tio n S t a g e 4 D u t y C y cle % y = x / 1 0 6 - 7 U n sig n e d C r a n k C a s e P r e s s u r e k P a y = x / 1 0 - 1 0 1.3";
+CM_ BO_ 1003 "0x3EB 50Hz 
+0 - 3 U n sig n e d R a c e Tim e r m s y = x 4 - 5 Sig n e d Ig nitio n A n gle B a n k 1 � y = x / 1 0 6 - 7 Sig n e d Ig nitio n A n gle B a n k 2 � y = x / 1 0";
+CM_ BO_ 1004 "0x3EC 50Hz 
+0 - 1 Sig n e d T o r q u e M a n a g e m e n t Driv e s h a f t R P M y = x R P M T a r g e t 2 - 3 Sig n e d T o r q u e M a n a g e m e n t Driv e s h a f t R P M T a r g e t E r r o r R P M y = x 4 - 5 Sig n e d T o r q u e M a n a g e m e n t Driv e s h a f t R P M T a r g e t E r r o r Ignitio n C o r r e c tio n � y = x / 1 0 6 - 7 Sig n e d T o r q u e M a n a g e m e n t Driv e s h a f t R P M Tim e d Ignitio n C o r r e c tio n � y = x / 1 0";
+CM_ BO_ 1005 "0x3ED 50Hz 
+0 - 1 Sig n e d T o r q u e M a n a g e m e n t Co m bin e d Ignition Correction � y = x / 1 0";
+CM_ BO_ 886 "0x376 10Hz
+0 - 1 U n sig n e d A m bie n t Air Tem p e r a t u r e K y = x / 1 0 
+2 - 3 Sig n e d R ela tiv e H u midit y % y = x / 1 0 
+4 - 5 U n sig n e d S p e cific H u midit y p p m y = x * 1 0 0 
+6 - 7 U n sig n e d A b s olu t e H u midit y g / m 3 y = x / 1 0";
+CM_ BO_ 1006 "0x3EE 20Hz 
+0 - 1 U n sig n e d Wid e b a n d S e n s o r 5 ? y = x / 1 0 0 0 
+2 - 3 U n sig n e d Wid e b a n d S e n s o r 6 ? y = x / 1 0 0 0 
+4 - 5 U n sig n e d Wid e b a n d S e n s o r 7 ? y = x / 1 0 0 0 
+6 - 7 U n sig n e d Wid e b a n d S e n s o r 8 ? y = x / 1 0 0 0";
+CM_ BO_ 1007 "0x3EF 20Hz 
+0 - 1 U n sig n e d Wid e b a n d S e n s o r 9 ? y = x / 1 0 0 0 
+2 - 3 Unsign ed Wideband Sensor 10 ? y = x/1000 
+4 - 5 Unsign ed Wideband Sensor 11 ? y = x/1000 
+6 - 7 Unsign ed Wideband Sensor 12 ? y = x/1000";
+CM_ BO_ 1136 "0x470 20Hz 
+0 - 1 Unsign ed Wideband Overall ? y = x/1000 
+2 - 3 Unsign ed Wideband Bank 1 ? y = x/1000 
+4 - 5 Unsign ed Wideband Bank 2 ? y = x/1000 
+6 Signed Gear Selector Position enu m y := 0=Neutral, -1=Reverse, -2=Park, -3=Unknown, -4=Drive, -5=Sport, -6=Manual, -7 Low, -8=Overdrive 
+7 Signed Gear - Can be combined with selector pos enu m y := -1=Reverse, 0=Neutral, 1=1st, 2=2nd, 3=3rd, 4=4th, 5=5th, 6=6th";
+CM_ BO_ 1137 "0x471 50Hz 
+0 - 1 Signed Injector Pressure Differential kPa y = x/10 
+2 - 3 Unsign ed Accelerato r Pedal Position % y = x/10";
+CM_ BO_ 1138 "0x472 20Hz 
+0 - 1 Unsign ed Cruise Control Target Speed km/h y = x/10 
+2 - 3 Unsign ed Cruise Control Last Target Speed km/h y = x/10 
+4 - 5 Signed Cruise Control Speed Error km/h y = x/10 
+6:7 - 6:4 Unsign ed Cruise Control Controller State enu m y := 0=Disabled, 1=Inactive, 2=Cruising, 3=Accelerating, 4=Decelerating 
+6:3 - 7:0 Unsign ed Cruise Control Input State enu m y := 0=Unused, 1=Disable, 2=Enable, 3=Enable/Disable, 4=Cancel, 8=Set, 12=Set/Cancel, 16=Resume, 20=Resume/Cancel, 32=Accel, 64=Decel, 76=Set/Coast/Cancel, 84=Resume/Coast/Ca ncel, 128=Increment, 168=Set/Accel/+, 176=Resume/Accel/+, 256=Decrement, 328=Set/Coast/-, 336=Resume/Coast/-, 512=Rest Position";
+VAL_ 1136 Gear_Selector_Position 0 "Neutral" -1 "Reverse" -2 "Park" -3 "Unknown" -4 "Drive" -5 "Sport" -6 "Manual" -7 "Low" -8 "Overdrive" ;
+VAL_ 1136 Gear -1 "Reverse" 0 "Neutral" 1 "1st" 2 "2nd" 3 "3rd" 4 "4th" 5 "5th" 6 "6th" ;
+VAL_ 1138 Cruise_Controller_State 0 "Disabled" 1 "Inactive" 2 "Cruising" 3 "Accelerating" 4 "Decelerating" ;
+VAL_ 1138 Cruise_Input_State 0 "Unused" 1 "Disable" 2 "Enable" 3 "Enable/Disable" 4 "Cancel" 8 "Set" 12 "Set/Cancel" 16 "Resume" 20 "Resume/Cancel" 32 "Accel" 64 "Decel" 76 "Set/Coast/Cancel" 84 "Resume/Coast/Cancel" 128 "Increment" 168 "Set/Accel/Increment" 176 "Resume/Accel/Increment" 256 "Decrement" 328 "Set/Coast/Decrement" 336 "Resume/Coast/Decrement" 512 "Rest Position" ;
+
