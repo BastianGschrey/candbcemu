@@ -76,7 +76,8 @@ ApplicationWindow {
     ListModel { id: logModel }
 
     function pushLog(text) {
-        logModel.append({ text: text })
+        var timestamp = Qt.formatTime(new Date(), "hh:mm:ss")
+        logModel.append({ text: "[" + timestamp + "] " + text })
         if (logModel.count > 400)
             logModel.remove(0)
         logView.positionViewAtEnd()
