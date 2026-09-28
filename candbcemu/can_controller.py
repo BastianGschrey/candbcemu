@@ -166,6 +166,10 @@ class CanController(QObject):
     def availableInterfaces(self):
         return list_can_interfaces()
 
+    @Property(str, constant=True)
+    def vcanScriptPath(self):
+        return str(Path(__file__).resolve().parent.parent / "scripts" / "setup_vcan.sh")
+
     # -- interface discovery -------------------------------------------
     @Slot()
     def refreshInterfaces(self):
@@ -304,6 +308,60 @@ class CanController(QObject):
                 self.logMessage.emit(f"{' '.join(cmd)} failed: {result.stderr.strip()}")
                 return False
         self.logMessage.emit(f"{channel} configured at {bitrate} bps")
+        self.availableInterfacesChanged.emit()
+        return True
+
+    @Slot(str, result=bool)
+    def createVcanInterface(self, name: str) -> bool:
+        """Load the vcan kernel module and bring up a virtual SocketCAN link.
+
+        Equivalent to scripts/setup_vcan.sh - requires CAP_NET_ADMIN (root).
+        Safe to call on an interface that already exists.
+        """
+        name = name.strip() or "vcan0"
+
+        try:
+            result = subprocess.run(
+                ["modprobe", "vcan"], capture_output=True, text=True, timeout=5
+            )
+        except FileNotFoundError:
+            self.logMessage.emit("'modprobe' command not found")
+            return False
+        except Exception as exc:  # noqa: BLE001
+            self.logMessage.emit(f"modprobe vcan failed: {exc}")
+            return False
+        if result.returncode != 0:
+            self.logMessage.emit(f"modprobe vcan failed: {result.stderr.strip()}")
+            return False
+
+        try:
+            result = subprocess.run(
+                ["ip", "link", "add", "dev", name, "type", "vcan"],
+                capture_output=True, text=True, timeout=5,
+            )
+        except FileNotFoundError:
+            self.logMessage.emit("'ip' command not found - install iproute2")
+            return False
+        except Exception as exc:  # noqa: BLE001
+            self.logMessage.emit(f"ip link add {name} failed: {exc}")
+            return False
+        if result.returncode != 0 and "File exists" not in result.stderr:
+            self.logMessage.emit(f"ip link add {name} failed: {result.stderr.strip()}")
+            return False
+
+        try:
+            result = subprocess.run(
+                ["ip", "link", "set", "up", name],
+                capture_output=True, text=True, timeout=5,
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.logMessage.emit(f"ip link set up {name} failed: {exc}")
+            return False
+        if result.returncode != 0:
+            self.logMessage.emit(f"ip link set up {name} failed: {result.stderr.strip()}")
+            return False
+
+        self.logMessage.emit(f"Virtual CAN interface '{name}' is up")
         self.availableInterfacesChanged.emit()
         return True
 
