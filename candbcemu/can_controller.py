@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 from urllib.parse import unquote, urlparse
@@ -42,14 +44,47 @@ def _effective_range(sig) -> tuple[float, float]:
 
 
 def _decimals_for_scale(scale: float) -> int:
+    """Number of fractional digits needed to display multiples of `scale` exactly."""
     if not scale:
         return 0
-    value = abs(scale)
-    decimals = 0
-    while value < 1 and decimals < 6:
-        value *= 10
-        decimals += 1
-    return decimals
+    exponent = Decimal(repr(abs(float(scale)))).normalize().as_tuple().exponent
+    return min(6, max(0, -exponent))
+
+
+_EXTENDED_KEY_FLAG = 1 << 30  # extended IDs use at most 29 bits, so this stays within QML's int range
+_MAX_CYCLE_MS = 3_600_000
+
+
+def _message_key(msg: DbcMessage) -> int:
+    """Unique per-message key: a standard and an extended frame may share the same ID."""
+    return msg.frame_id | (_EXTENDED_KEY_FLAG if msg.is_extended_frame else 0)
+
+
+def _initial_physical(sig) -> Optional[float]:
+    raw = getattr(sig, "raw_initial", None)
+    if raw is not None:
+        return float(raw) * sig.scale + sig.offset
+    try:
+        return float(sig.initial) if sig.initial is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _mux_selectors(msg: DbcMessage) -> dict[str, list[int]]:
+    """Map each multiplexer selector signal to the selector values the DBC defines."""
+    selectors: dict[str, list[int]] = {}
+
+    def walk(nodes):
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            for selector, branches in node.items():
+                selectors[selector] = sorted(int(i) for i in branches)
+                for children in branches.values():
+                    walk(children)
+
+    walk(msg.signal_tree)
+    return selectors
 
 
 @dataclass
@@ -140,6 +175,9 @@ class CanController(QObject):
     connectionError = Signal(str)
     logMessage = Signal(str)
     availableInterfacesChanged = Signal()
+    busyChanged = Signal()
+    vcanCreated = Signal(str)
+    vcanFailed = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -149,6 +187,7 @@ class CanController(QObject):
         self._tx_states: dict[int, TxState] = {}
         self._connected = False
         self._dbc_name = ""
+        self._busy = False
 
     # -- properties ---------------------------------------------------
     @Property(QObject, constant=True)
@@ -162,6 +201,10 @@ class CanController(QObject):
     @Property(str, notify=dbcLoaded)
     def dbcName(self):
         return self._dbc_name
+
+    @Property(bool, notify=busyChanged)
+    def busy(self):
+        return self._busy
 
     @Property("QVariantList", notify=availableInterfacesChanged)
     def availableInterfaces(self):
@@ -193,18 +236,33 @@ class CanController(QObject):
         for msg in sorted(db.messages, key=lambda m: m.frame_id):
             values = {}
             sig_list = []
+            mux_ids = _mux_selectors(msg)
             for sig in msg.signals:
                 minimum, maximum = _effective_range(sig)
-                initial = sig.initial if sig.initial is not None else (
-                    0.0 if minimum <= 0.0 <= maximum else minimum
-                )
-                values[sig.name] = initial
-                choices = []
-                if sig.choices:
+                if sig.name in mux_ids:
+                    # Only the selector values the DBC defines encode successfully.
+                    choice_values = [float(i) * sig.scale + sig.offset for i in mux_ids[sig.name]]
                     choices = [
-                        {"value": int(raw), "name": str(name)}
-                        for raw, name in sorted(sig.choices.items())
+                        {"value": value, "name": str(sig.choices.get(i, i)) if sig.choices else str(i)}
+                        for i, value in zip(mux_ids[sig.name], choice_values)
                     ]
+                elif sig.choices:
+                    # DBC value tables are keyed by raw value; signals carry physical values.
+                    choice_values = [float(raw) * sig.scale + sig.offset for raw in sorted(sig.choices)]
+                    choices = [
+                        {"value": value, "name": str(sig.choices[raw])}
+                        for raw, value in zip(sorted(sig.choices), choice_values)
+                    ]
+                else:
+                    choice_values = []
+                    choices = []
+
+                initial = _initial_physical(sig)
+                if initial is None:
+                    initial = 0.0 if minimum <= 0.0 <= maximum else minimum
+                if choice_values and not any(abs(initial - v) < 1e-9 for v in choice_values):
+                    initial = choice_values[0]
+                values[sig.name] = initial
                 sig_list.append({
                     "name": sig.name,
                     "unit": sig.unit or "",
@@ -218,17 +276,17 @@ class CanController(QObject):
                 })
             rows.append({
                 "name": msg.name,
-                "msg_id": msg.frame_id,
+                "msg_id": _message_key(msg),
                 "msg_id_hex": f"0x{msg.frame_id:X}",
                 "dlc": msg.length,
                 "comment": msg.comment or "",
-                "cycle_time": msg.cycle_time or 100,
+                "cycle_time": min(_MAX_CYCLE_MS, max(1, msg.cycle_time or 100)),
                 "transmit_enabled": False,
                 "raw_hex": "",
                 "sig_list": sig_list,
                 "extended": bool(msg.is_extended_frame),
             })
-            self._tx_states[msg.frame_id] = TxState(message=msg, values=values)
+            self._tx_states[_message_key(msg)] = TxState(message=msg, values=values)
 
         self._model.reset(rows)
         for row_idx in range(len(rows)):
@@ -242,6 +300,10 @@ class CanController(QObject):
     # -- bus connection ------------------------------------------------
     @Slot(str, str, int, result=bool)
     def connectBus(self, iface_type: str, channel: str, bitrate: int) -> bool:
+        if iface_type == "slcan" and bitrate <= 0:
+            self.connectionError.emit("Invalid bitrate")
+            self.logMessage.emit("Connection failed: invalid bitrate")
+            return False
         if self._bus is not None:
             self.disconnectBus()
         try:
@@ -284,87 +346,53 @@ class CanController(QObject):
         for row in range(self._model.rowCount()):
             self._model.update_field(row, "transmit_enabled", False, MessageListModel.TransmitEnabledRole)
 
-    @Slot(str, int, result=bool)
-    def applySocketcanBitrate(self, channel: str, bitrate: int) -> bool:
+    @Slot(str, int)
+    def applySocketcanBitrate(self, channel: str, bitrate: int):
         """Bring a SocketCAN link down, set its bitrate, and bring it back up.
 
         Requires CAP_NET_ADMIN (typically root) - reports failure via logMessage
-        rather than silently retrying with elevated privileges.
+        rather than silently retrying with elevated privileges. Runs off the GUI thread.
         """
+        if bitrate <= 0:
+            self.logMessage.emit("Invalid bitrate")
+            return
         commands = [
             ["ip", "link", "set", channel, "down"],
             ["ip", "link", "set", channel, "type", "can", "bitrate", str(bitrate)],
             ["ip", "link", "set", channel, "up"],
         ]
-        for cmd in commands:
-            try:
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            except FileNotFoundError:
-                self.logMessage.emit("'ip' command not found - install iproute2")
-                return False
-            except Exception as exc:  # noqa: BLE001
-                self.logMessage.emit(f"{' '.join(cmd)} failed: {exc}")
-                return False
-            if result.returncode != 0:
-                self.logMessage.emit(f"{' '.join(cmd)} failed: {result.stderr.strip()}")
-                return False
-        self.logMessage.emit(f"{channel} configured at {bitrate} bps")
-        self.availableInterfacesChanged.emit()
-        return True
 
-    @Slot(str, result=bool)
-    def createVcanInterface(self, name: str) -> bool:
+        def work():
+            if self._run_commands(commands):
+                self.logMessage.emit(f"{channel} configured at {bitrate} bps")
+                self.availableInterfacesChanged.emit()
+
+        self._run_async(work)
+
+    @Slot(str)
+    def createVcanInterface(self, name: str):
         """Load the vcan kernel module and bring up a virtual SocketCAN link.
 
         Equivalent to scripts/setup_vcan.sh - requires CAP_NET_ADMIN (root).
-        Safe to call on an interface that already exists.
+        Safe to call on an interface that already exists. Runs off the GUI thread
+        and reports the outcome via vcanCreated / vcanFailed.
         """
         name = name.strip() or "vcan0"
+        commands = [
+            ["modprobe", "vcan"],
+            ["ip", "link", "add", "dev", name, "type", "vcan"],
+            ["ip", "link", "set", "up", name],
+        ]
 
-        try:
-            result = subprocess.run(
-                ["modprobe", "vcan"], capture_output=True, text=True, timeout=5
-            )
-        except FileNotFoundError:
-            self.logMessage.emit("'modprobe' command not found")
-            return False
-        except Exception as exc:  # noqa: BLE001
-            self.logMessage.emit(f"modprobe vcan failed: {exc}")
-            return False
-        if result.returncode != 0:
-            self.logMessage.emit(f"modprobe vcan failed: {result.stderr.strip()}")
-            return False
+        def work():
+            if self._run_commands(commands, tolerate={1: "File exists"}):
+                self.logMessage.emit(f"Virtual CAN interface '{name}' is up")
+                self.availableInterfacesChanged.emit()
+                self.vcanCreated.emit(name)
+            else:
+                self.vcanFailed.emit(name)
 
-        try:
-            result = subprocess.run(
-                ["ip", "link", "add", "dev", name, "type", "vcan"],
-                capture_output=True, text=True, timeout=5,
-            )
-        except FileNotFoundError:
-            self.logMessage.emit("'ip' command not found - install iproute2")
-            return False
-        except Exception as exc:  # noqa: BLE001
-            self.logMessage.emit(f"ip link add {name} failed: {exc}")
-            return False
-        if result.returncode != 0 and "File exists" not in result.stderr:
-            self.logMessage.emit(f"ip link add {name} failed: {result.stderr.strip()}")
-            return False
-
-        try:
-            result = subprocess.run(
-                ["ip", "link", "set", "up", name],
-                capture_output=True, text=True, timeout=5,
-            )
-        except Exception as exc:  # noqa: BLE001
-            self.logMessage.emit(f"ip link set up {name} failed: {exc}")
-            return False
-        if result.returncode != 0:
-            self.logMessage.emit(f"ip link set up {name} failed: {result.stderr.strip()}")
-            return False
-
-        self.logMessage.emit(f"Virtual CAN interface '{name}' is up")
-        self.availableInterfacesChanged.emit()
-        return True
+        self._run_async(work)
 
     # -- signal / message control ---------------------------------------
     @Slot(int, str, float)
@@ -401,10 +429,13 @@ class CanController(QObject):
             if data is None:
                 return
             can_msg = can.Message(
-                arbitration_id=msg_id,
+                arbitration_id=state.message.frame_id,
                 data=data,
                 is_extended_id=state.message.is_extended_frame,
             )
+            if state.task is not None:
+                state.task.stop()
+                state.task = None
             period_s = self._model._rows[row]["cycle_time"] / 1000.0
             try:
                 state.task = self._bus.send_periodic(can_msg, period_s)
@@ -434,7 +465,7 @@ class CanController(QObject):
         if data is None:
             return
         can_msg = can.Message(
-            arbitration_id=msg_id,
+            arbitration_id=state.message.frame_id,
             data=data,
             is_extended_id=state.message.is_extended_frame,
         )
@@ -445,6 +476,45 @@ class CanController(QObject):
             self.logMessage.emit(f"Send failed for {state.message.name}: {exc}")
 
     # -- internals -------------------------------------------------------
+    def _run_async(self, work):
+        """Run a blocking job on a worker thread; `busy` is true while it runs."""
+        if self._busy:
+            self.logMessage.emit("Another operation is still running")
+            return
+
+        def runner():
+            try:
+                work()
+            finally:
+                self._busy = False
+                self.busyChanged.emit()
+
+        self._busy = True
+        self.busyChanged.emit()
+        threading.Thread(target=runner, daemon=True).start()
+
+    def _run_commands(self, commands: list[list[str]], tolerate: Optional[dict[int, str]] = None) -> bool:
+        """Run commands in order; stop and log on the first failure.
+
+        `tolerate` maps a command index to stderr text that counts as success.
+        """
+        for i, cmd in enumerate(commands):
+            text = " ".join(cmd)
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            except FileNotFoundError:
+                self.logMessage.emit(f"'{cmd[0]}' command not found")
+                return False
+            except Exception as exc:  # noqa: BLE001
+                self.logMessage.emit(f"{text} failed: {exc}")
+                return False
+            if result.returncode != 0 and not (
+                tolerate and i in tolerate and tolerate[i] in result.stderr
+            ):
+                self.logMessage.emit(f"{text} failed: {result.stderr.strip()}")
+                return False
+        return True
+
     def _reencode(self, msg_id: int, push_to_task: bool) -> Optional[bytes]:
         state = self._tx_states.get(msg_id)
         if state is None:
@@ -452,21 +522,21 @@ class CanController(QObject):
         try:
             data = state.message.encode(state.values, padding=True, strict=False)
         except Exception as exc:  # noqa: BLE001
-            self.logMessage.emit(f"Encode error for 0x{msg_id:X}: {exc}")
+            self.logMessage.emit(f"Encode error for {state.message.name}: {exc}")
             return None
         row = self._model.find_row_by_id(msg_id)
         if row >= 0:
             self._model.update_field(row, "raw_hex", data.hex(" ").upper(), MessageListModel.RawHexRole)
         if push_to_task and state.task is not None:
             can_msg = can.Message(
-                arbitration_id=msg_id,
+                arbitration_id=state.message.frame_id,
                 data=data,
                 is_extended_id=state.message.is_extended_frame,
             )
             try:
                 state.task.modify_data(can_msg)
             except Exception as exc:  # noqa: BLE001
-                self.logMessage.emit(f"Failed to update running TX for 0x{msg_id:X}: {exc}")
+                self.logMessage.emit(f"Failed to update running TX for {state.message.name}: {exc}")
         return data
 
     def _refresh_raw_hex(self, row: int):
