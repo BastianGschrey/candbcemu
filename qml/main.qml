@@ -24,10 +24,60 @@ ApplicationWindow {
         onAccepted: canController.loadDbc(selectedFile)
     }
 
+    Dialog {
+        id: vcanHelpDialog
+        objectName: "vcanHelpDialog"
+        title: "Manual setup needed"
+        modal: true
+        anchors.centerIn: parent
+        width: Math.min(560, window.width - 80)
+        standardButtons: Dialog.Close
+
+        property string vcanName: "vcan0"
+
+        contentItem: ColumnLayout {
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: "Creating a virtual CAN interface needs root privileges, which this app doesn't have (and shouldn't run with). Run this once in a terminal, then just pick the channel below and connect:"
+            }
+
+            TextArea {
+                objectName: "vcanCommandText"
+                Layout.fillWidth: true
+                readOnly: true
+                selectByMouse: true
+                wrapMode: Text.WrapAnywhere
+                font.family: "monospace"
+                text: "sudo " + canController.vcanScriptPath + " " + vcanHelpDialog.vcanName
+                background: Rectangle { color: Qt.darker(window.Material.background, 1.3); radius: 4 }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                font.pixelSize: 11
+                text: "Equivalent manual commands:\nsudo modprobe vcan\nsudo ip link add dev " + vcanHelpDialog.vcanName + " type vcan\nsudo ip link set up " + vcanHelpDialog.vcanName
+            }
+
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                opacity: 0.7
+                font.pixelSize: 11
+                text: "The interface stays up until reboot - you only need to do this once."
+            }
+        }
+    }
+
     ListModel { id: logModel }
 
     function pushLog(text) {
-        logModel.append({ text: text })
+        var timestamp = Qt.formatTime(new Date(), "hh:mm:ss")
+        logModel.append({ text: "[" + timestamp + "] " + text })
         if (logModel.count > 400)
             logModel.remove(0)
         logView.positionViewAtEnd()
@@ -103,6 +153,23 @@ ApplicationWindow {
                     ToolTip.text: "Refresh interface list"
                     ToolTip.visible: hovered
                     onClicked: canController.refreshInterfaces()
+                }
+
+                Button {
+                    objectName: "createVcanButton"
+                    text: "Create vcan"
+                    visible: ifaceTypeBox.currentText === "socketcan"
+                    enabled: !canController.connected
+                    ToolTip.text: "Loads the vcan kernel module and brings up a virtual SocketCAN link (needs CAP_NET_ADMIN / root)"
+                    ToolTip.visible: hovered
+                    onClicked: {
+                        var name = channelBox.editText.trim() || "vcan0"
+                        channelBox.editText = name
+                        if (!canController.createVcanInterface(name)) {
+                            vcanHelpDialog.vcanName = name
+                            vcanHelpDialog.open()
+                        }
+                    }
                 }
 
                 Label { text: "Bitrate" }

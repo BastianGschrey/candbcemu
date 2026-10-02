@@ -61,17 +61,23 @@ sufficient privileges or configure the interface yourself beforehand.
 
 ### Testing without real hardware
 
-Create a virtual SocketCAN interface:
+With interface type `socketcan`, the **Create vcan** button next to the
+channel field loads the `vcan` kernel module and brings up a virtual
+SocketCAN link with that name (default `vcan0`) - the in-app equivalent of:
 
 ```bash
 sudo ./scripts/setup_vcan.sh vcan0
 ```
 
-Then select interface type `socketcan`, channel `vcan0`, and connect (no
-bitrate configuration needed for virtual interfaces). Watch traffic with
-`candump vcan0` in another terminal. This is also how two separate
-applications on the same machine (e.g. this sender and a separate receiver
-tool) talk to each other - both just open the same `vcan0` interface.
+Both need `CAP_NET_ADMIN` (root); if the button's log message reports a
+permission error, run the app itself as root or run the script beforehand
+instead.
+
+Once the interface exists, select channel `vcan0` and connect (no bitrate
+configuration needed for virtual interfaces). Watch traffic with `candump
+vcan0` in another terminal. This is also how two separate applications on
+the same machine (e.g. this sender and a separate receiver tool) talk to
+each other - both just open the same `vcan0` interface.
 
 Alternatively, interface type `virtual` needs no setup at all, but only
 works *within the same Python process* - it's meant for quick UI testing,
