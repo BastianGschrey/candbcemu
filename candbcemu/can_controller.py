@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import threading
+from collections import deque
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
@@ -13,7 +14,7 @@ from urllib.parse import unquote, urlparse
 import can
 import cantools
 from cantools.database import Message as DbcMessage
-from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Property, Qt, Signal, Slot
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Property, Qt, QTimer, Signal, Slot
 
 from .net_utils import list_can_interfaces
 
@@ -85,6 +86,27 @@ def _mux_selectors(msg: DbcMessage) -> dict[str, list[int]]:
 
     walk(msg.signal_tree)
     return selectors
+
+
+_RX_QUEUE_MAX = 2000
+_RX_FLUSH_MS = 50
+_RX_LINES_PER_FLUSH = 100
+
+
+class _RxListener(can.Listener):
+    """Collects frames on the python-can notifier thread; the GUI thread drains them."""
+
+    def __init__(self):
+        self.queue: deque = deque(maxlen=_RX_QUEUE_MAX)
+        self.dropped = 0
+
+    def on_message_received(self, msg: can.Message) -> None:
+        if len(self.queue) == self.queue.maxlen:
+            self.dropped += 1
+        self.queue.append(msg)
+
+    def on_error(self, exc: Exception) -> None:
+        self.queue.append(exc)
 
 
 @dataclass
@@ -188,6 +210,12 @@ class CanController(QObject):
         self._connected = False
         self._dbc_name = ""
         self._busy = False
+        self._notifier: Optional[can.Notifier] = None
+        self._rx_listener: Optional[_RxListener] = None
+        self._rx_logging = True
+        self._rx_timer = QTimer(self)
+        self._rx_timer.setInterval(_RX_FLUSH_MS)
+        self._rx_timer.timeout.connect(self._flush_rx)
 
     # -- properties ---------------------------------------------------
     @Property(QObject, constant=True)
@@ -325,6 +353,9 @@ class CanController(QObject):
             return False
 
         self._bus = bus
+        self._rx_listener = _RxListener()
+        self._notifier = can.Notifier(bus, [self._rx_listener])
+        self._rx_timer.start()
         self._connected = True
         self.connectionChanged.emit(True)
         self.logMessage.emit(f"Connected: {iface_type} channel='{channel}' bitrate={bitrate}")
@@ -333,6 +364,14 @@ class CanController(QObject):
     @Slot()
     def disconnectBus(self):
         self._stop_all_periodic()
+        self._rx_timer.stop()
+        if self._notifier is not None:
+            try:
+                self._notifier.stop()
+            except Exception as exc:  # noqa: BLE001
+                self.logMessage.emit(f"Error while stopping receiver: {exc}")
+            self._notifier = None
+        self._rx_listener = None
         if self._bus is not None:
             try:
                 self._bus.shutdown()
@@ -393,6 +432,11 @@ class CanController(QObject):
                 self.vcanFailed.emit(name)
 
         self._run_async(work)
+
+    # -- receiving -------------------------------------------------------
+    @Slot(bool)
+    def setRxLogging(self, enabled: bool):
+        self._rx_logging = enabled
 
     # -- signal / message control ---------------------------------------
     @Slot(int, str, float)
@@ -476,6 +520,52 @@ class CanController(QObject):
             self.logMessage.emit(f"Send failed for {state.message.name}: {exc}")
 
     # -- internals -------------------------------------------------------
+    def _flush_rx(self):
+        listener = self._rx_listener
+        if listener is None:
+            return
+        if listener.dropped:
+            dropped, listener.dropped = listener.dropped, 0
+            if self._rx_logging:
+                self.logMessage.emit(f"RX overflow: {dropped} frames dropped")
+        for _ in range(_RX_LINES_PER_FLUSH):
+            try:
+                item = listener.queue.popleft()
+            except IndexError:
+                break
+            if not self._rx_logging:
+                continue
+            if isinstance(item, Exception):
+                self.logMessage.emit(f"RX error: {item}")
+            else:
+                self.logMessage.emit(self._format_rx(item))
+
+    def _format_rx(self, msg: can.Message) -> str:
+        if msg.is_error_frame:
+            return "RX error frame"
+        id_text = f"0x{msg.arbitration_id:X}" + (" (ext)" if msg.is_extended_id else "")
+        if msg.is_remote_frame:
+            return f"RX {id_text} remote request [{msg.dlc}]"
+        data = bytes(msg.data)
+        line = f"RX {id_text} [{len(data)}] {data.hex(' ').upper()}"
+        key = msg.arbitration_id | (_EXTENDED_KEY_FLAG if msg.is_extended_id else 0)
+        state = self._tx_states.get(key)
+        if state is None:
+            return line
+        try:
+            decoded = state.message.decode(data, allow_truncated=True)
+        except Exception as exc:  # noqa: BLE001
+            return f"{line}  {state.message.name}: decode error ({exc})"
+        parts = []
+        for sig in state.message.signals:
+            if sig.name not in decoded:
+                continue
+            value = decoded[sig.name]
+            if isinstance(value, float):
+                value = f"{value:.{_decimals_for_scale(sig.scale)}f}"
+            parts.append(f"{sig.name}={value}{(' ' + sig.unit) if sig.unit else ''}")
+        return f"{line}  {state.message.name}: {', '.join(parts)}"
+
     def _run_async(self, work):
         """Run a blocking job on a worker thread; `busy` is true while it runs."""
         if self._busy:

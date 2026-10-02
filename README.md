@@ -44,6 +44,11 @@ Or use the launcher script from anywhere:
    time (editable, defaults to 100 ms if the DBC doesn't specify one), or hit
    **Send once** for a single frame.
 
+8. Every frame received on the bus is printed to the **Log** panel (`RX 0x360 [8] …`).
+   If the ID is in the loaded DBC, the signals are decoded as well. Untick
+   **Show received frames** in the log header to mute it; on a very busy bus,
+   excess frames are dropped from the log and reported as `RX overflow`.
+
 ### SocketCAN bitrate
 
 On Linux, a SocketCAN interface's bitrate is a property of the network link
