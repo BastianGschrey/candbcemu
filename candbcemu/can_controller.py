@@ -100,6 +100,7 @@ class MessageListModel(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._rows: list[dict] = []
+        self._row_by_id: dict[int, int] = {}
 
     def roleNames(self):
         return self._ROLE_NAMES
@@ -118,15 +119,15 @@ class MessageListModel(QAbstractListModel):
     def reset(self, rows: list[dict]):
         self.beginResetModel()
         self._rows = rows
+        self._row_by_id = {row["msg_id"]: i for i, row in enumerate(rows)}
         self.endResetModel()
 
     def find_row_by_id(self, msg_id: int) -> int:
-        for i, row in enumerate(self._rows):
-            if row["msg_id"] == msg_id:
-                return i
-        return -1
+        return self._row_by_id.get(msg_id, -1)
 
     def update_field(self, row: int, field_name: str, value, role: int):
+        if self._rows[row].get(field_name) == value:
+            return
         self._rows[row][field_name] = value
         idx = self.index(row)
         self.dataChanged.emit(idx, idx, [role])
@@ -446,10 +447,10 @@ class CanController(QObject):
     # -- internals -------------------------------------------------------
     def _reencode(self, msg_id: int, push_to_task: bool) -> Optional[bytes]:
         state = self._tx_states.get(msg_id)
-        if state is None or self._db is None:
+        if state is None:
             return None
         try:
-            data = self._db.encode_message(msg_id, state.values, padding=True, strict=False)
+            data = state.message.encode(state.values, padding=True, strict=False)
         except Exception as exc:  # noqa: BLE001
             self.logMessage.emit(f"Encode error for 0x{msg_id:X}: {exc}")
             return None
