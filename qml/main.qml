@@ -407,7 +407,17 @@ ApplicationWindow {
                 anchors.fill: parent
                 spacing: 4
 
-                Label { text: "Log"; font.bold: true }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: "Log"; font.bold: true }
+                    Item { Layout.fillWidth: true }
+                    CheckBox {
+                        objectName: "rxLogCheck"
+                        text: "Show received frames"
+                        checked: true
+                        onToggled: canController.setRxLogging(checked)
+                    }
+                }
 
                 ListView {
                     id: logView
