@@ -88,6 +88,10 @@ ApplicationWindow {
         function onDbcError(message) { pushLog("ERROR: " + message) }
         function onConnectionError(message) { pushLog("ERROR: " + message) }
         function onLogMessage(message) { pushLog(message) }
+        function onVcanFailed(name) {
+            vcanHelpDialog.vcanName = name
+            vcanHelpDialog.open()
+        }
     }
 
     header: ToolBar {
@@ -159,16 +163,13 @@ ApplicationWindow {
                     objectName: "createVcanButton"
                     text: "Create vcan"
                     visible: ifaceTypeBox.currentText === "socketcan"
-                    enabled: !canController.connected
+                    enabled: !canController.connected && !canController.busy
                     ToolTip.text: "Loads the vcan kernel module and brings up a virtual SocketCAN link (needs CAP_NET_ADMIN / root)"
                     ToolTip.visible: hovered
                     onClicked: {
                         var name = channelBox.editText.trim() || "vcan0"
                         channelBox.editText = name
-                        if (!canController.createVcanInterface(name)) {
-                            vcanHelpDialog.vcanName = name
-                            vcanHelpDialog.open()
-                        }
+                        canController.createVcanInterface(name)
                     }
                 }
 
@@ -186,10 +187,10 @@ ApplicationWindow {
                 Button {
                     text: "Apply Bitrate"
                     visible: ifaceTypeBox.currentText === "socketcan"
-                    enabled: !canController.connected && channelBox.editText.length > 0
+                    enabled: !canController.connected && !canController.busy && channelBox.editText.length > 0
                     ToolTip.text: "Runs 'ip link set <iface> down/up' with this bitrate (needs CAP_NET_ADMIN / root)"
                     ToolTip.visible: hovered
-                    onClicked: canController.applySocketcanBitrate(channelBox.editText, parseInt(bitrateBox.editText) || 500000)
+                    onClicked: canController.applySocketcanBitrate(channelBox.editText, parseInt(bitrateBox.editText) || 0)
                 }
 
                 Item { Layout.fillWidth: true }
@@ -206,7 +207,7 @@ ApplicationWindow {
                             canController.connectBus(
                                 ifaceTypeBox.currentText,
                                 channelBox.editText,
-                                parseInt(bitrateBox.editText) || 500000
+                                parseInt(bitrateBox.editText) || 0
                             )
                         }
                     }
@@ -294,9 +295,9 @@ ApplicationWindow {
 
                         Label { text: "every" }
                         SpinBox {
-                            from: 5
-                            to: 60000
-                            stepSize: 5
+                            from: 1
+                            to: 3600000
+                            stepSize: 1
                             value: msgCard.cycleTime
                             editable: true
                             Layout.preferredWidth: 150
@@ -371,7 +372,7 @@ ApplicationWindow {
                                     valueRole: "value"
                                     Component.onCompleted: {
                                         for (var i = 0; i < sig.choices.length; i++) {
-                                            if (sig.choices[i].value === sig.initial) {
+                                            if (Math.abs(sig.choices[i].value - sig.initial) < 1e-9) {
                                                 currentIndex = i
                                                 break
                                             }
