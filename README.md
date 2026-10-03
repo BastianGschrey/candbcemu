@@ -99,3 +99,44 @@ not for talking to other tools or processes.
 - `databases/` - sample DBC files
 - `scripts/setup_vcan.sh` - helper to create a virtual CAN interface
 - `candbcemu.sh` - convenience launcher
+
+## Headless sender (Raspberry Pi, no screen)
+
+`candbcemu.headless` sends demo data for a DBC without Qt or a display, e.g. from a
+Raspberry Pi 2B with a PiCAN2 as a test source for another CAN device. It needs only
+`cantools` and `python-can`.
+
+Every signal gets a curve from its range and its name/unit (engine speed swings quickly,
+temperatures drift slowly, enumerations step through their values, multiplexed messages
+cycle through their selector values). Values are limited to what the DBC range *and* the
+signal's bits can hold.
+
+```bash
+python3 -m candbcemu.headless --dbc emu_black.dbc --channel can0 --bitrate 500000 --auto
+# test without hardware:   sudo ./scripts/setup_vcan.sh vcan0
+python3 -m candbcemu.headless --dbc emu_black.dbc --channel vcan0 --no-set-bitrate --auto
+```
+
+Web UI on `http://<host>:8080/` (no login - test device on a trusted network): choose the
+DBC, start/stop, switch messages on/off, change cycle times, and per signal either "Auto"
+(demo curve) or "Fest" with a slider. `--config sender.json` overrides curves per signal:
+
+```json
+{"signals": {"RPM": {"kind": "triangle", "period": 6, "lo": 900, "hi": 7000}},
+ "messages": {"ID_0x360": {"cycle": 20, "enabled": true}}}
+```
+
+(`kind`: sine, triangle, square, const, choices, manual.)
+
+### Raspberry Pi 2B + PiCAN2
+
+1. Flash Raspberry Pi OS Lite (32-bit) with the Raspberry Pi Imager (enable SSH, set Wi-Fi/user there).
+2. Copy this repository to the Pi, then on the Pi: `sudo ./scripts/pi-install.sh emu_black.dbc`
+   (installs the venv, adds `dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=25` to `config.txt`,
+   enables the `candbcemu-headless` service), then `sudo reboot`.
+3. Wire CAN-H, CAN-L and GND to the device under test. **Terminate with 120 Ω at both ends of the
+   bus** (PiCAN2 has a solder jumper for its 120 Ω) - without a second node and termination the
+   controller reports errors continuously.
+4. Check: `ip -details link show can0`, `candump can0`, web UI on port 8080.
+
+Tests: `python3 -m unittest discover -s tests`.

@@ -1,0 +1,2 @@
+cantools>=44.1
+python-can>=4.6
