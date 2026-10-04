@@ -3,6 +3,7 @@
 // "CAN-Sender-ESP" until a network is configured). Wiring: CS=5 SCK=18 MISO=19 MOSI=23.
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <ArduinoOTA.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <Preferences.h>
@@ -36,6 +37,15 @@ static String logLine = "";
 static uint8_t tec = 0, rec = 0, eflg = 0;
 static unsigned long lastStatus = 0;
 static File uploadFile;
+
+// The web server runs in its own task (core 0), CAN transmission in loop() (core 1): a slow HTTP
+// request must never delay a frame. Everything that touches `db`, the MCP2515 or the run state is
+// done under this mutex; network I/O is not.
+static SemaphoreHandle_t g_lock;
+struct Lock {
+    Lock() { xSemaphoreTakeRecursive(g_lock, portMAX_DELAY); }
+    ~Lock() { xSemaphoreGiveRecursive(g_lock); }
+};
 static String uploadName, uploadError;
 
 static void note(const String &s) {
@@ -69,11 +79,14 @@ static bool loadDbc(const String &name) {
         note("DBC " + name + ": " + String(err.c_str()));
         return false;
     }
-    db = std::move(fresh);
-    dbcName = name;
-    prefs.putString("dbc", name);
-    unsigned long now = millis();
-    for (auto &m : db.messages) m.nextDue = now;
+    {
+        Lock lock;
+        db = std::move(fresh);
+        dbcName = name;
+        prefs.putString("dbc", name);
+        unsigned long now = millis();
+        for (auto &m : db.messages) m.nextDue = now;
+    }
     note("DBC " + name + ": " + String((unsigned)db.messages.size()) + " messages");
     return true;
 }
@@ -101,6 +114,7 @@ static CAN_SPEED speedFor(int bps) {
 }
 
 static bool canStart(int bps, int mhz) {
+    Lock lock;
     mcp.reset();
     CAN_CLOCK clk = mhz == 16 ? MCP_16MHZ : mhz == 20 ? MCP_20MHZ : MCP_8MHZ;
     if (mcp.setBitrate(speedFor(bps), clk) != MCP2515::ERROR_OK || mcp.setNormalMode() != MCP2515::ERROR_OK) {
@@ -119,12 +133,14 @@ static bool canStart(int bps, int mhz) {
 }
 
 static void canStop() {
+    Lock lock;
     running = false;
     mcp.setConfigMode();
     note("gestoppt");
 }
 
 static void transmit() {
+    Lock lock;
     if (!running) return;
     unsigned long now = millis();
     double t = (now - startedAt) / 1000.0;
@@ -141,6 +157,9 @@ static void transmit() {
         m.nextDue += m.cycleMs;
         if ((long)(m.nextDue - now) < -500) m.nextDue = now;   // far behind: do not burst
     }
+    // Nobody needs received frames; empty the receive buffers so the controller never reports overflow.
+    struct can_frame rx;
+    while (mcp.checkReceive() && mcp.readMessage(&rx) == MCP2515::ERROR_OK) {}
     if (now - lastStatus > 1000) {
         lastStatus = now;
         tec = mcp.errorCountTX();
@@ -180,6 +199,10 @@ static bool bodyJson(JsonDocument &doc) {
 }
 
 static void handleState() {
+    std::vector<String> names = listDbcs();
+    String out;
+    {
+    Lock lock;
     JsonDocument d;
     d["dbc"] = dbcName;
     d["running"] = running;
@@ -193,8 +216,8 @@ static void handleState() {
     d["eflg"] = eflg;
     d["wifi"] = WiFi.getMode() == WIFI_AP ? String("AP ") + WiFi.softAPIP().toString() : WiFi.localIP().toString();
     d["heap"] = ESP.getFreeHeap();
-    JsonArray names = d["dbcs"].to<JsonArray>();
-    for (auto &n : listDbcs()) names.add(n);
+    JsonArray nameArr = d["dbcs"].to<JsonArray>();
+    for (auto &n : names) nameArr.add(n);
     JsonArray msgs = d["messages"].to<JsonArray>();
     for (size_t i = 0; i < db.messages.size(); i++) {
         auto &m = db.messages[i];
@@ -231,7 +254,10 @@ static void handleState() {
             so["selector"] = (int)k == m.muxSwitch;
         }
     }
-    sendJson(d);
+    serializeJson(d, out);
+    }
+    server.sendHeader("Cache-Control", "no-store");
+    server.send(200, "application/json", out);   // the slow part (network) happens outside the lock
 }
 
 static void ok() {
@@ -249,6 +275,7 @@ static void handleDbc() {
 }
 
 static void handleDelete() {
+    Lock lock;
     JsonDocument b;
     if (!bodyJson(b)) return sendError("bad request");
     String name = safeName(b["name"] | "");
@@ -270,6 +297,7 @@ static void handleConnect() {
 static void handleDisconnect() { canStop(); ok(); }
 
 static void handleAll() {
+    Lock lock;
     JsonDocument b;
     if (!bodyJson(b)) return sendError("bad request");
     bool en = b["enabled"] | false;
@@ -278,6 +306,7 @@ static void handleAll() {
 }
 
 static void handleMessage() {
+    Lock lock;
     JsonDocument b;
     if (!bodyJson(b)) return sendError("bad request");
     size_t key = b["key"] | -1;
@@ -289,6 +318,7 @@ static void handleMessage() {
 }
 
 static void handleSignal() {
+    Lock lock;
     JsonDocument b;
     if (!bodyJson(b)) return sendError("bad request");
     size_t key = b["key"] | -1;
@@ -383,7 +413,10 @@ static void startWifi() {
     }
 }
 
+static void webTask(void *);
+
 void setup() {
+    g_lock = xSemaphoreCreateRecursiveMutex();
     Serial.begin(115200);
     delay(300);
     LittleFS.begin(true);
@@ -409,10 +442,23 @@ void setup() {
     server.on("/api/wifi", HTTP_GET, handleWifiGet);
     server.on("/api/wifi", HTTP_POST, handleWifiSet);
     server.begin();
+    ArduinoOTA.setHostname(HOSTNAME);
+    ArduinoOTA.setPassword("cansender");
+    ArduinoOTA.onStart([]() { Lock lock; running = false; });   // stop sending while the firmware is replaced
+    ArduinoOTA.begin();
+    WiFi.setSleep(false);   // modem sleep adds up to 100s of ms of latency to every request
+    xTaskCreatePinnedToCore(webTask, "web", 12288, nullptr, 1, nullptr, 0);
+}
+
+static void webTask(void *) {
+    for (;;) {
+        server.handleClient();
+        ArduinoOTA.handle();
+        delay(2);
+    }
 }
 
 void loop() {
-    server.handleClient();
     transmit();
     delay(1);
 }

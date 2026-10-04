@@ -50,6 +50,9 @@ struct Database {
     std::vector<Message> messages;
 };
 
+// Latin-1 -> UTF-8 unless the text already is valid UTF-8 (parse() does this itself).
+std::string toUtf8(const std::string &text);
+
 // Parses DBC text. Returns false (and a reason in `error`) if nothing usable was found.
 bool parse(const std::string &text, Database &db, std::string &error);
 

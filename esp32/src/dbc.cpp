@@ -122,7 +122,34 @@ static void parseValLine(const std::string &line, Database &db) {
     }
 }
 
-bool parse(const std::string &text, Database &db, std::string &error) {
+// DBC files are usually Latin-1 / Windows-1252 ("°C" is a single 0xB0 byte). The web UI and JSON want
+// UTF-8, so convert unless the text already is valid UTF-8.
+static bool validUtf8(const std::string &t) {
+    size_t i = 0;
+    while (i < t.size()) {
+        unsigned char c = t[i];
+        int n = c < 0x80 ? 0 : (c >> 5) == 6 ? 1 : (c >> 4) == 14 ? 2 : (c >> 3) == 30 ? 3 : -1;
+        if (n < 0) return false;
+        for (int k = 1; k <= n; k++)
+            if (i + k >= t.size() || (t[i + k] & 0xC0) != 0x80) return false;
+        i += n + 1;
+    }
+    return true;
+}
+
+std::string toUtf8(const std::string &t) {
+    if (validUtf8(t)) return t;
+    std::string out;
+    out.reserve(t.size() + 16);
+    for (unsigned char c : t) {
+        if (c < 0x80) out += (char)c;
+        else { out += (char)(0xC0 | (c >> 6)); out += (char)(0x80 | (c & 0x3F)); }
+    }
+    return out;
+}
+
+bool parse(const std::string &rawText, Database &db, std::string &error) {
+    const std::string text = toUtf8(rawText);
     db.messages.clear();
     size_t i = 0;
     while (i <= text.size()) {
