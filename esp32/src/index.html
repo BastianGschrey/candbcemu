@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAN Demo-Sender (ESP32)</title>
+<style>
+  :root { --bg:#0a0a0c; --surface:#151518; --alt:#1f1f24; --text:#f2f2f2; --dim:#8a8a92; --green:#39d353; --red:#eb5757; --orange:#f2994a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, sans-serif; }
+  header { position:sticky; top:0; z-index:2; background:var(--surface); padding:10px 14px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  h1 { font-size:17px; margin:0 8px 0 0; }
+  select, input, button { background:var(--alt); color:var(--text); border:1px solid #333; border-radius:8px; padding:8px 10px; font:inherit; }
+  button, label.btn { cursor:pointer; } button.go { background:var(--green); color:#000; border:0; font-weight:600; } button.stop { background:var(--red); border:0; }
+  label.btn { background:var(--alt); border:1px solid #333; border-radius:8px; padding:8px 10px; }
+  main { padding:12px 14px; max-width:960px; margin:auto; }
+  .status { color:var(--dim); font-size:13px; padding:4px 14px; } .status b { color:var(--orange); font-weight:600; }
+  .bad { color:var(--red); }
+  .msg { background:var(--surface); border-radius:10px; margin:10px 0; padding:10px 12px; }
+  .msg > summary { cursor:pointer; display:flex; gap:10px; align-items:center; list-style:none; }
+  .msg .name { font-weight:600; } .msg .meta { color:var(--dim); font-size:13px; margin-left:auto; }
+  .sig { display:grid; grid-template-columns: 1fr 90px; gap:2px 10px; padding:8px 0; border-top:1px solid var(--alt); }
+  .sig .n { grid-column:1/-1; display:flex; justify-content:space-between; }
+  .sig .val { color:var(--orange); font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; padding:0; }
+  .raw { font:12px ui-monospace, monospace; color:var(--dim); }
+  .err { color:var(--red); font-size:12px; }
+  .sw { width:44px; height:24px; accent-color:var(--green); }
+  dialog { background:var(--surface); color:var(--text); border:1px solid #333; border-radius:12px; max-width:380px; width:90%; }
+  dialog::backdrop { background:#000a; } dialog input, dialog select { width:100%; margin:6px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CAN Demo-Sender</h1>
+  <select id="dbc"></select>
+  <label class="btn">DBC hochladen<input id="file" type="file" accept=".dbc,text/plain" hidden></label>
+  <button id="del" title="Ausgewählte DBC löschen">🗑</button>
+  <select id="bitrate"><option>125000</option><option>250000</option><option selected>500000</option><option>1000000</option></select>
+  <select id="clock" title="Quarz des MCP2515-Moduls"><option value="8">8 MHz</option><option value="16">16 MHz</option><option value="20">20 MHz</option></select>
+  <button id="conn" class="go">Starten</button>
+  <button id="all">Alle an</button><button id="none">Alle aus</button>
+  <button id="wifi">WLAN</button>
+</header>
+<div class="status" id="status"></div>
+<main id="list"></main>
+<dialog id="wdlg">
+  <h3 style="margin-top:0">WLAN</h3>
+  <select id="ssidlist"></select>
+  <input id="ssid" placeholder="SSID">
+  <input id="psk" type="password" placeholder="Passwort">
+  <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px">
+    <button id="wcancel">Abbrechen</button><button id="wsave" class="go">Speichern + Neustart</button>
+  </div>
+</dialog>
+<script>
+const $ = id => document.getElementById(id);
+let state = null, dragging = false, open = new Set(), busy = false;
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json(); if (j.error) alert(j.error); return j;
+}
+function fmt(v) { return Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2); }
+$('dbc').onchange = async () => { await api('/api/dbc', {name:$('dbc').value}); state = null; refresh(); };
+$('del').onclick = async () => { if (state && state.dbc && confirm(state.dbc + ' löschen?')) { await api('/api/dbc/delete', {name:state.dbc}); state = null; refresh(); } };
+$('file').onchange = async () => {
+  const f = $('file').files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('dbc', f, f.name);
+  const r = await fetch('/api/upload', {method:'POST', body:fd}); const j = await r.json();
+  if (j.error) alert(j.error); $('file').value = ''; state = null; refresh();
+};
+$('conn').onclick = async () => {
+  if (state && state.running) await api('/api/disconnect', {});
+  else await api('/api/connect', {bitrate:+$('bitrate').value, clock:+$('clock').value});
+  refresh();
+};
+$('all').onclick = async () => { await api('/api/all', {enabled:true}); refresh(); };
+$('none').onclick = async () => { await api('/api/all', {enabled:false}); refresh(); };
+$('wifi').onclick = async () => {
+  $('wdlg').showModal();
+  try { const j = await (await fetch('/api/wifi')).json();
+    $('ssidlist').innerHTML = '<option value="">– Netzwerk wählen –</option>' + j.networks.map(n => `<option>${n}</option>`).join('');
+    $('ssid').value = j.ssid || ''; } catch (e) {}
+};
+$('ssidlist').onchange = () => { if ($('ssidlist').value) $('ssid').value = $('ssidlist').value; };
+$('wcancel').onclick = () => $('wdlg').close();
+$('wsave').onclick = async () => { await api('/api/wifi', {ssid:$('ssid').value, psk:$('psk').value}); $('wdlg').close(); alert('Neustart – danach unter der neuen Adresse erreichbar'); };
+
+function build() {
+  const list = $('list'); list.innerHTML = '';
+  for (const m of state.messages) {
+    const d = document.createElement('details'); d.className = 'msg'; d.dataset.key = m.key; d.open = open.has(m.key);
+    d.ontoggle = () => d.open ? open.add(m.key) : open.delete(m.key);
+    d.innerHTML = `<summary><input type="checkbox" class="sw" ${m.enabled?'checked':''}><span class="name">${m.name}</span><span>${m.id}</span>
+      <span class="meta"><span class="cnt"></span> · <input class="cyc" type="number" min="5" value="${m.cycle}" style="width:70px;padding:3px"> ms</span></summary>
+      <div class="raw"></div><div class="err"></div>`;
+    const sw = d.querySelector('.sw'); sw.onclick = e => e.stopPropagation(); sw.onchange = () => api('/api/message', {key:m.key, enabled:sw.checked});
+    const cyc = d.querySelector('.cyc'); cyc.onclick = e => e.stopPropagation(); cyc.onchange = () => api('/api/message', {key:m.key, cycle:+cyc.value});
+    for (const s of m.signals) {
+      const row = document.createElement('div'); row.className = 'sig'; row.dataset.sig = s.name;
+      const step = (s.hi - s.lo) / 500;
+      row.innerHTML = `<div class="n"><span>${s.name} <small style="color:var(--dim)">${s.unit}</small></span><span class="val"></span></div>
+        <input type="range" min="${s.lo}" max="${s.hi}" step="${step}" value="${s.value}" ${s.selector?'disabled':''}>
+        <select ${s.selector?'disabled':''}><option value="auto">Auto</option><option value="manual">Fest</option></select>`;
+      const rng = row.querySelector('input'), sel = row.querySelector('select');
+      rng.onpointerdown = () => dragging = true;
+      rng.onpointerup = () => dragging = false;
+      rng.oninput = () => { sel.value = 'manual'; api('/api/signal', {key:m.key, name:s.name, kind:'manual', value:+rng.value}); };
+      sel.onchange = () => api('/api/signal', sel.value === 'manual' ? {key:m.key, name:s.name, kind:'manual'} : {key:m.key, name:s.name, kind:'auto'});
+      d.appendChild(row);
+    }
+    list.appendChild(d);
+  }
+}
+function update() {
+  for (const m of state.messages) {
+    const d = document.querySelector(`details[data-key="${m.key}"]`); if (!d) continue;
+    d.querySelector('.cnt').textContent = m.sent + ' gesendet';
+    d.querySelector('.raw').textContent = m.raw;
+    d.querySelector('.err').textContent = m.errors ? `${m.errors} Sendeversuche ohne Erfolg (Puffer voll – kein ACK?)` : '';
+    for (const s of m.signals) {
+      const row = d.querySelector(`[data-sig="${CSS.escape(s.name)}"]`); if (!row) continue;
+      row.querySelector('.val').textContent = fmt(s.value);
+      const sel = row.querySelector('select'), rng = row.querySelector('input');
+      sel.value = (s.kind === 'manual' || s.kind === 'const') ? 'manual' : 'auto';
+      if (!dragging) rng.value = s.value;
+    }
+  }
+}
+async function refresh() {
+  if (busy) return; busy = true;
+  try {
+    const prev = state; state = await (await fetch('/api/state')).json();
+    const dbc = $('dbc');
+    if (dbc.options.length !== state.dbcs.length || (state.dbc && dbc.value !== state.dbc))
+      dbc.innerHTML = '<option value="">– DBC –</option>' + state.dbcs.map(n => `<option>${n}</option>`).join('');
+    if (state.dbc) dbc.value = state.dbc;
+    $('bitrate').value = state.bitrate; $('clock').value = state.clock;
+    $('conn').textContent = state.running ? 'Stoppen' : 'Starten'; $('conn').className = state.running ? 'stop' : 'go';
+    const bad = state.running && (state.tec >= 96 || (state.eflg & 0x20));
+    $('status').innerHTML = (state.running ? `Sendet @ ${state.bitrate/1000} kbit/s` : 'Gestoppt') + ` · ${state.wifi}`
+      + (state.running ? ` · TEC ${state.tec} / REC ${state.rec}` : '') + (bad ? ' <span class="bad">· Bus meldet Fehler (kein ACK / Verkabelung / Abschluss?)</span>' : '')
+      + (state.log.length ? ` · <b>${state.log[state.log.length-1]}</b>` : '');
+    const sig = x => x ? x.dbc + x.messages.length : '';
+    if (!prev || sig(prev) !== sig(state)) build();
+    update();
+  } catch (e) {} finally { busy = false; }
+}
+refresh(); setInterval(() => { if (!dragging) refresh(); }, 1000);
+</script>
+</body>
+</html>
