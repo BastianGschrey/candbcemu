@@ -37,6 +37,12 @@ pio run -t upload --upload-port /dev/ttyUSB0
 The status line shows the controller's TEC/REC error counters: if they climb, nobody acknowledges
 the frames (wiring, termination, bit rate).
 
+## Updating the firmware
+
+After the first USB flash the web UI can replace the firmware itself: build (`pio run`), then press
+**Firmware** in the header and pick `esp32/.pio/build/esp32dev/firmware.bin`. The device restarts
+(a few seconds). Without a browser: `pio run -e ota -t upload` (password `cansender`).
+
 ## Tests (on the PC)
 
 `dbc.cpp` is plain C++ and is compared with cantools (frame bytes for min/max/mid values and the

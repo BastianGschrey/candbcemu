@@ -41,6 +41,7 @@
   <button id="conn" class="go">Starten</button>
   <button id="all">Alle an</button><button id="none">Alle aus</button>
   <button id="wifi">WLAN</button>
+  <label class="btn" title="Neue Firmware (firmware.bin) einspielen">Firmware<input id="fw" type="file" accept=".bin" hidden></label>
 </header>
 <div class="status" id="status"></div>
 <main id="list"></main>
@@ -68,6 +69,16 @@ $('file').onchange = async () => {
   const fd = new FormData(); fd.append('dbc', f, f.name);
   const r = await fetch('/api/upload', {method:'POST', body:fd}); const j = await r.json();
   if (j.error) alert(j.error); $('file').value = ''; state = null; refresh();
+};
+$('fw').onchange = async () => {
+  const f = $('fw').files[0]; if (!f) return;
+  if (!confirm(`Firmware ${f.name} (${(f.size/1024).toFixed(0)} KB) einspielen? Das Gerät startet neu.`)) { $('fw').value = ''; return; }
+  $('status').textContent = 'Firmware wird übertragen … nicht ausschalten';
+  const fd = new FormData(); fd.append('fw', f, f.name);
+  try { const r = await fetch('/api/firmware', {method:'POST', body:fd}); const j = await r.json();
+    if (j.error) alert(j.error); else { $('status').textContent = 'Neustart …'; setTimeout(() => location.reload(), 12000); } }
+  catch (e) { $('status').textContent = 'Neustart …'; setTimeout(() => location.reload(), 12000); }
+  $('fw').value = '';
 };
 $('conn').onclick = async () => {
   if (state && state.running) await api('/api/disconnect', {});
@@ -140,7 +151,7 @@ async function refresh() {
     const bad = state.running && (state.tec >= 96 || (state.eflg & 0x20));
     $('status').innerHTML = (state.running ? `Sendet @ ${state.bitrate/1000} kbit/s` : 'Gestoppt') + ` · ${state.wifi}`
       + (state.running ? ` · TEC ${state.tec} / REC ${state.rec}` : '') + (bad ? ' <span class="bad">· Bus meldet Fehler (kein ACK / Verkabelung / Abschluss?)</span>' : '')
-      + (state.log.length ? ` · <b>${state.log[state.log.length-1]}</b>` : '');
+      + ` · FW ${state.fw}` + (state.log.length ? ` · <b>${state.log[state.log.length-1]}</b>` : '');
     const sig = x => x ? x.dbc + x.messages.length : '';
     if (!prev || sig(prev) !== sig(state)) build();
     update();

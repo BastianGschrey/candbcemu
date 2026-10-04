@@ -9,6 +9,7 @@
 #include <Preferences.h>
 #include <SPI.h>
 #include <WebServer.h>
+#include <Update.h>
 #include <WiFi.h>
 #include <mcp2515.h>
 
@@ -37,6 +38,8 @@ static String logLine = "";
 static uint8_t tec = 0, rec = 0, eflg = 0;
 static unsigned long lastStatus = 0;
 static File uploadFile;
+static String fwError;
+static const char *FW_VERSION = __DATE__ " " __TIME__;
 
 // The web server runs in its own task (core 0), CAN transmission in loop() (core 1): a slow HTTP
 // request must never delay a frame. Everything that touches `db`, the MCP2515 or the run state is
@@ -216,6 +219,7 @@ static void handleState() {
     d["eflg"] = eflg;
     d["wifi"] = WiFi.getMode() == WIFI_AP ? String("AP ") + WiFi.softAPIP().toString() : WiFi.localIP().toString();
     d["heap"] = ESP.getFreeHeap();
+    d["fw"] = FW_VERSION;
     JsonArray nameArr = d["dbcs"].to<JsonArray>();
     for (auto &n : names) nameArr.add(n);
     JsonArray msgs = d["messages"].to<JsonArray>();
@@ -387,6 +391,32 @@ static void uploadChunk() {
     }
 }
 
+// Firmware update from the browser: POST the app image (.pio/build/esp32dev/firmware.bin).
+static void fwDone() {
+    if (!fwError.isEmpty() || Update.hasError()) {
+        String e = fwError.isEmpty() ? String(Update.errorString()) : fwError;
+        return sendError("Update fehlgeschlagen: " + e, 500);
+    }
+    ok();
+    delay(500);
+    ESP.restart();
+}
+
+static void fwChunk() {
+    HTTPUpload &up = server.upload();
+    if (up.status == UPLOAD_FILE_START) {
+        fwError = "";
+        { Lock lock; running = false; }          // stop sending while the flash is rewritten
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) fwError = Update.errorString();
+    } else if (up.status == UPLOAD_FILE_WRITE) {
+        if (fwError.isEmpty() && Update.write(up.buf, up.currentSize) != up.currentSize) fwError = Update.errorString();
+    } else if (up.status == UPLOAD_FILE_END) {
+        if (fwError.isEmpty() && !Update.end(true)) fwError = Update.errorString();
+    } else if (up.status == UPLOAD_FILE_ABORTED) {
+        Update.abort();
+    }
+}
+
 static void handleRoot() {
     server.sendHeader("Cache-Control", "no-store");
     server.send_P(200, "text/html; charset=utf-8", (const char *)index_html_start, index_html_end - index_html_start - 1);
@@ -439,6 +469,7 @@ void setup() {
     server.on("/api/all", HTTP_POST, handleAll);
     server.on("/api/message", HTTP_POST, handleMessage);
     server.on("/api/signal", HTTP_POST, handleSignal);
+    server.on("/api/firmware", HTTP_POST, fwDone, fwChunk);
     server.on("/api/wifi", HTTP_GET, handleWifiGet);
     server.on("/api/wifi", HTTP_POST, handleWifiSet);
     server.begin();
