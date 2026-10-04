@@ -301,6 +301,8 @@ void buildProfiles(Database &db) {
                 }
             }
             s.autoKind = s.kind;
+            s.defLo = s.lo;
+            s.defHi = s.hi;
             s.manual = s.lo;
             s.value = s.lo;
         }

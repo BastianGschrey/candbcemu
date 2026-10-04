@@ -73,6 +73,26 @@ class SenderTests(unittest.TestCase):
         self.assertEqual(sender.snapshot()["messages"][0]["cycle"], 5)       # lower bound
 
 
+    def test_auto_min_max(self):
+        sender = Sender()
+        sender.load_dbc(str(DBCS[0]))
+        msg = sender.snapshot()["messages"][0]
+        sig = next(s for s in msg["signals"] if not s["selector"] and s["kind"] in ("sine", "triangle"))
+        k, n = msg["key"], sig["name"]
+        get = lambda: next(x for x in sender.snapshot()["messages"][0]["signals"] if x["name"] == n)
+        span = sig["hi"] - sig["lo"]
+        sender.set_signal(k, n, lo=sig["lo"] + 0.2 * span, hi=sig["lo"] + 0.4 * span)
+        self.assertAlmostEqual(get()["alo"], sig["lo"] + 0.2 * span)
+        self.assertAlmostEqual(get()["ahi"], sig["lo"] + 0.4 * span)
+        sender.set_signal(k, n, hi=sig["hi"] + 1e9)                 # clamped to what the signal can hold
+        self.assertEqual(get()["ahi"], sig["hi"])
+        sender.set_signal(k, n, lo=sig["hi"], hi=sig["lo"])         # inverted: hi never below lo
+        self.assertGreaterEqual(get()["ahi"], get()["alo"])
+        sender.set_signal(k, n, reset=True)
+        self.assertNotEqual(get()["alo"], sig["hi"])
+        self.assertLess(get()["alo"], get()["ahi"])
+
+
 class WebTests(unittest.TestCase):
     def test_api(self):
         sender = Sender()

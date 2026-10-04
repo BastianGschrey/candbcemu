@@ -81,7 +81,8 @@ def make_server(sender: Sender, dbc_dir: Path, port: int, host: str = "0.0.0.0")
                         return self._json({"error": "unknown message"}, 404)
                 elif path == "/api/signal":
                     if not sender.set_signal(int(data["key"]), str(data["name"]), data.get("kind"),
-                                             data.get("value"), data.get("period")):
+                                             data.get("value"), data.get("period"), data.get("lo"),
+                                             data.get("hi"), bool(data.get("reset"))):
                         return self._json({"error": "unknown signal"}, 404)
                 else:
                     return self.send_error(404)

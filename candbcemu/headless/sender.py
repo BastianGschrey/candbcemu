@@ -30,6 +30,8 @@ class SignalState:
     is_selector: bool = False
     value: float = 0.0           # last value sent
     auto_kind: str = "sine"      # the demo curve to go back to from "manual"
+    def_lo: float = 0.0          # the automatic min/max, to go back to
+    def_hi: float = 1.0
 
 
 @dataclass
@@ -110,7 +112,7 @@ class Sender:
                         if k in override:
                             setattr(profile, k, override[k] if k == "kind" else float(override[k]))
                     state.signals.append(SignalState(sig.name, sig.unit or "", lo, hi, profile, is_selector,
-                                                     auto_kind=profile.kind))
+                                                     auto_kind=profile.kind, def_lo=profile.lo, def_hi=profile.hi))
                 state.enabled = (was_running and msg.name in enabled_before) or msg_cfg.get(
                     msg.name, {}).get("enabled", False)
                 self._messages[state.key] = state
@@ -242,7 +244,8 @@ class Sender:
             return True
 
     def set_signal(self, key: int, name: str, kind: Optional[str] = None, value: Optional[float] = None,
-                   period: Optional[float] = None) -> bool:
+                   period: Optional[float] = None, lo: Optional[float] = None, hi: Optional[float] = None,
+                   reset: bool = False) -> bool:
         with self._lock:
             state = self._messages.get(key)
             sig = next((s for s in state.signals if s.name == name), None) if state else None
@@ -260,6 +263,18 @@ class Sender:
                 sig.profile.value = min(sig.hi, max(sig.lo, float(value)))
             if period is not None:
                 sig.profile.period = max(0.05, float(period))
+            # min/max of the automatic curve, inside what the signal can hold
+            if reset:
+                sig.profile.lo, sig.profile.hi = sig.def_lo, sig.def_hi
+            if lo is not None:
+                sig.profile.lo = min(sig.hi, max(sig.lo, float(lo)))
+            if hi is not None:
+                sig.profile.hi = min(sig.hi, max(sig.lo, float(hi)))
+            if sig.profile.hi < sig.profile.lo:
+                if lo is not None:
+                    sig.profile.hi = sig.profile.lo
+                else:
+                    sig.profile.lo = sig.profile.hi
             return True
 
     def snapshot(self) -> dict:
@@ -285,7 +300,8 @@ class Sender:
                         "signals": [
                             {"name": s.name, "unit": s.unit, "lo": s.lo, "hi": s.hi,
                              "kind": s.profile.kind, "value": s.value, "manual": s.profile.value,
-                             "period": s.profile.period, "selector": s.is_selector}
+                             "period": s.profile.period, "selector": s.is_selector,
+                             "alo": s.profile.lo, "ahi": s.profile.hi}
                             for s in m.signals
                         ],
                     }

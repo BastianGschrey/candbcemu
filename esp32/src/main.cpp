@@ -255,6 +255,8 @@ static void handleState() {
             so["value"] = s.value;
             so["manual"] = s.manual;
             so["period"] = s.period;
+            so["alo"] = s.lo;       // min/max of the automatic curve
+            so["ahi"] = s.hi;
             so["selector"] = (int)k == m.muxSwitch;
         }
     }
@@ -339,6 +341,10 @@ static void handleSignal() {
         }
         if (!b["value"].isNull()) s.manual = constrain((double)b["value"], s.rangeLo, s.rangeHi);
         if (!b["period"].isNull()) s.period = max(0.05, (double)b["period"]);
+        if (b["reset"] | false) { s.lo = s.defLo; s.hi = s.defHi; }
+        if (!b["lo"].isNull()) s.lo = constrain((double)b["lo"], s.rangeLo, s.rangeHi);
+        if (!b["hi"].isNull()) s.hi = constrain((double)b["hi"], s.rangeLo, s.rangeHi);
+        if (s.hi < s.lo) { if (!b["lo"].isNull()) s.hi = s.lo; else s.lo = s.hi; }
         return ok();
     }
     sendError("unknown signal", 404);

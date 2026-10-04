@@ -69,7 +69,15 @@ function build() {
       const step = (s.hi - s.lo) / 500;
       row.innerHTML = `<div class="n"><span>${s.name} <small style="color:var(--dim)">${s.unit}</small></span><span class="val"></span></div>
         <input type="range" min="${s.lo}" max="${s.hi}" step="${step}" value="${s.value}" ${s.selector?'disabled':''}>
-        <select ${s.selector?'disabled':''}><option value="auto">Auto</option><option value="manual">Fest</option></select>`;
+        <select ${s.selector?'disabled':''}><option value="auto">Auto</option><option value="manual">Fest</option></select>
+        <div class="rng" style="grid-column:1/-1;display:none;gap:6px;align-items:center;font-size:13px;color:var(--dim)">Auto von
+          <input class="amin" type="number" step="any" style="width:90px;padding:3px"> bis
+          <input class="amax" type="number" step="any" style="width:90px;padding:3px">
+          <button class="rst" title="Standardbereich" style="padding:2px 8px">↺</button></div>`;
+      const amin = row.querySelector('.amin'), amax = row.querySelector('.amax');
+      amin.onchange = () => api('/api/signal', {key:m.key, name:s.name, lo:+amin.value});
+      amax.onchange = () => api('/api/signal', {key:m.key, name:s.name, hi:+amax.value});
+      row.querySelector('.rst').onclick = () => api('/api/signal', {key:m.key, name:s.name, reset:true});
       const rng = row.querySelector('input'), sel = row.querySelector('select');
       rng.onpointerdown = () => dragging = true;
       rng.onpointerup = () => dragging = false;
@@ -92,6 +100,12 @@ function update() {
       const sel = row.querySelector('select'), rng = row.querySelector('input');
       if (s.kind === 'manual' || s.kind === 'const') sel.value = 'manual'; else sel.value = 'auto';
       if (!dragging) rng.value = s.value;
+      const box = row.querySelector('.rng');
+      box.style.display = (sel.value === 'auto' && !s.selector && s.kind !== 'choices') ? 'flex' : 'none';
+      for (const [cls, v] of [['.amin', s.alo], ['.amax', s.ahi]]) {
+        const inp = row.querySelector(cls);
+        if (document.activeElement !== inp && v !== undefined) inp.value = +(+v).toPrecision(6);
+      }
     }
   }
 }
