@@ -56,6 +56,62 @@ static void note(const String &s) {
     Serial.println(s);
 }
 
+// ---------------------------------------------------------------- saved min/max (per DBC)
+// The automatic min/max of every signal that differs from the default is kept in /cfg/<dbc>.json
+// and applied again whenever that DBC is loaded (so it survives a restart).
+static bool cfgDirty = false;
+static unsigned long cfgDirtyAt = 0;
+
+static String cfgPath(const String &dbcFile) { return "/cfg/" + dbcFile + ".json"; }
+
+static void markCfgDirty() {
+    cfgDirty = true;
+    cfgDirtyAt = millis();
+}
+
+static void saveCfg() {
+    Lock lock;
+    if (dbcName.isEmpty()) return;
+    JsonDocument d;
+    JsonObject sigs = d["signals"].to<JsonObject>();
+    for (auto &m : db.messages)
+        for (auto &s : m.signals)
+            if (s.lo != s.defLo || s.hi != s.defHi) {
+                char key[80];
+                snprintf(key, sizeof key, "%X/%s", (unsigned)m.id, s.name.c_str());
+                JsonObject e = sigs[key].to<JsonObject>();
+                e["lo"] = s.lo;
+                e["hi"] = s.hi;
+            }
+    String path = cfgPath(dbcName);
+    if (sigs.size() == 0) { LittleFS.remove(path); return; }
+    File f = LittleFS.open(path, "w");
+    if (f) { serializeJson(d, f); f.close(); }
+}
+
+static void applyCfg() {
+    Lock lock;
+    File f = LittleFS.open(cfgPath(dbcName), "r");
+    if (!f) return;
+    JsonDocument d;
+    DeserializationError err = deserializeJson(d, f);
+    f.close();
+    if (err) return;
+    JsonObject sigs = d["signals"];
+    for (auto &m : db.messages)
+        for (auto &s : m.signals) {
+            char key[80];
+            snprintf(key, sizeof key, "%X/%s", (unsigned)m.id, s.name.c_str());
+            JsonObject e = sigs[key];
+            if (e.isNull()) continue;
+            double lo = constrain((double)(e["lo"] | s.lo), s.rangeLo, s.rangeHi);
+            double hi = constrain((double)(e["hi"] | s.hi), s.rangeLo, s.rangeHi);
+            if (hi < lo) hi = lo;
+            s.lo = lo;
+            s.hi = hi;
+        }
+}
+
 // ---------------------------------------------------------------- DBC files
 static String safeName(String n) {
     int slash = n.lastIndexOf('/');
@@ -89,6 +145,7 @@ static bool loadDbc(const String &name) {
         prefs.putString("dbc", name);
         unsigned long now = millis();
         for (auto &m : db.messages) m.nextDue = now;
+        applyCfg();
     }
     note("DBC " + name + ": " + String((unsigned)db.messages.size()) + " messages");
     return true;
@@ -286,6 +343,7 @@ static void handleDelete() {
     if (!bodyJson(b)) return sendError("bad request");
     String name = safeName(b["name"] | "");
     LittleFS.remove("/dbc/" + name);
+    LittleFS.remove(cfgPath(name));
     if (name == dbcName) { db.messages.clear(); dbcName = ""; prefs.putString("dbc", ""); }
     ok();
 }
@@ -345,6 +403,7 @@ static void handleSignal() {
         if (!b["lo"].isNull()) s.lo = constrain((double)b["lo"], s.rangeLo, s.rangeHi);
         if (!b["hi"].isNull()) s.hi = constrain((double)b["hi"], s.rangeLo, s.rangeHi);
         if (s.hi < s.lo) { if (!b["lo"].isNull()) s.hi = s.lo; else s.lo = s.hi; }
+        if (!b["lo"].isNull() || !b["hi"].isNull() || (b["reset"] | false)) markCfgDirty();
         return ok();
     }
     sendError("unknown signal", 404);
@@ -457,6 +516,7 @@ void setup() {
     delay(300);
     LittleFS.begin(true);
     LittleFS.mkdir("/dbc");
+    LittleFS.mkdir("/cfg");
     prefs.begin("cansender", false);
     bitrate = prefs.getInt("bitrate", 500000);
     clockMHz = prefs.getInt("clock", 8);
@@ -491,6 +551,10 @@ static void webTask(void *) {
     for (;;) {
         server.handleClient();
         ArduinoOTA.handle();
+        if (cfgDirty && millis() - cfgDirtyAt > 1500) {   // a slider/field being edited: save once it settles
+            cfgDirty = false;
+            saveCfg();
+        }
         delay(2);
     }
 }

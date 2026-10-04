@@ -32,7 +32,7 @@ pio run -t upload --upload-port /dev/ttyUSB0
    joins it (`http://can-esp.local/` or the IP shown in the serial monitor).
 2. **DBC hochladen** (kept in flash, several files possible), choose bit rate and the crystal of the
    module (8 or 16 MHz), **Starten**, switch messages on (**Alle an**).
-3. Per signal: "Auto" (demo curve) or "Fest" with a slider.
+3. Per signal: "Auto" (demo curve, with editable min/max - kept in flash per DBC and restored after a restart, ↺ resets) or "Fest" with a slider.
 
 The status line shows the controller's TEC/REC error counters: if they climb, nobody acknowledges
 the frames (wiring, termination, bit rate).
