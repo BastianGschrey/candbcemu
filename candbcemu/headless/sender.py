@@ -126,7 +126,9 @@ class Sender:
         # The link may already be up at the right rate (and we may not be root): only complain
         # if it fails and the interface is not usable afterwards.
         for cmd in (["ip", "link", "set", channel, "down"],
-                    ["ip", "link", "set", channel, "type", "can", "bitrate", str(bitrate)],
+                    # restart-ms: leave BUS-OFF by itself (a bus with bit errors would otherwise
+                    # keep the interface dead - "Network is down" - until someone restarts it)
+                    ["ip", "link", "set", channel, "type", "can", "bitrate", str(bitrate), "restart-ms", "100"],
                     ["ip", "link", "set", channel, "up"]):
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)
             if result.returncode != 0:
