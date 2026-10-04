@@ -25,6 +25,7 @@ struct Signal {
     enum Kind { Sine, Triangle, Square, Const, Choices, Manual };
     Kind kind = Sine, autoKind = Sine;
     double period = 10.0, lo = 0.0, hi = 1.0, phase = 0.0, manual = 0.0;
+    bool quantize = false;                   // whole numbers only (gear): the curve steps
     double defLo = 0.0, defHi = 1.0;         // the automatic min/max, to go back to
     double rangeLo = 0.0, rangeHi = 1.0;    // hard limits (DBC range cut to what the bits can hold)
     double value = 0.0;                      // last value used

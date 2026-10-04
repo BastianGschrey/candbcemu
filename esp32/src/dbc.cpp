@@ -272,7 +272,7 @@ void buildProfiles(Database &db) {
                 {"boost|map|manifold|press|kpa|bar|psi", Signal::Sine, 7, 0.1, 0.7},
                 {"batt|volt", Signal::Sine, 30, 0.62, 0.7},
                 {"lambda|afr|o2", Signal::Sine, 5, 0.45, 0.6},
-                {"gear", Signal::Square, 6, 0.1, 0.6},
+                {"gear|gang", Signal::Triangle, 36, 0.14, 0.86},
                 {"flag|status|warn|alarm|light|lamp|switch|state", Signal::Square, 12, 0.0, 1.0},
             };
             s.kind = Signal::Sine;
@@ -292,6 +292,7 @@ void buildProfiles(Database &db) {
             } else {
                 for (auto &r : rules) {
                     if (has(text, r.words)) {
+                        s.quantize = std::string(r.words).compare(0, 4, "gear") == 0;
                         s.kind = r.kind;
                         s.period = r.period;
                         s.lo = s.rangeLo + r.f0 * span;
@@ -323,7 +324,8 @@ double evaluate(const Signal &s, double t) {
     if (s.kind == Signal::Triangle) unit = 1.0 - std::fabs(2.0 * x - 1.0);
     else if (s.kind == Signal::Square) unit = x >= 0.5 ? 1.0 : 0.0;
     else unit = 0.5 - 0.5 * std::cos(2.0 * M_PI * x);
-    return s.lo + unit * (s.hi - s.lo);
+    double v = s.lo + unit * (s.hi - s.lo);
+    return s.quantize ? std::nearbyint(v) : v;
 }
 
 // ---------------------------------------------------------------- encoding

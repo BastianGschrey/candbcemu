@@ -29,6 +29,18 @@ class PatternTests(unittest.TestCase):
                                         f"{path.name} {msg.name}.{sig.name}={v} not in {lo}..{hi}")
 
 
+class GearTests(unittest.TestCase):
+    def test_gear_steps_through_whole_gears(self):
+        db = cantools.database.load_file(str(ROOT / "databases" / "emu_black.dbc"))
+        sig = next(s for m in db.messages for s in m.signals if s.name == "GEAR")
+        p = profile_for(sig)
+        values = [evaluate(p, t * 0.25) for t in range(0, 4 * 36)]
+        self.assertTrue(all(v == int(v) for v in values))
+        self.assertGreaterEqual(len(set(values)), 5)          # climbs through several gears ...
+        changes = sum(1 for a, b in zip(values, values[1:]) if a != b)
+        self.assertLess(changes, 20)                          # ... and does not flip back and forth
+
+
 class SenderTests(unittest.TestCase):
     def test_every_message_of_every_dbc_is_sent_and_decodes(self):
         for path in DBCS:

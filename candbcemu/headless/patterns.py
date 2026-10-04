@@ -30,6 +30,7 @@ class Profile:
     phase: float = 0.0            # 0..1 of a period
     value: float = 0.0            # const / manual
     choices: list = field(default_factory=list)  # physical values for kind "choices"
+    quantize: bool = False        # whole numbers only (gear): the curve steps
 
     def to_dict(self) -> dict:
         return {"kind": self.kind, "period": self.period, "lo": self.lo, "hi": self.hi,
@@ -45,7 +46,7 @@ _RULES = [
     (r"boost|map|manifold|press|kpa|bar|psi", "sine", 7.0, 0.1, 0.7),
     (r"batt|volt|^v$| v$", "sine", 30.0, 0.62, 0.7),
     (r"lambda|afr|o2", "sine", 5.0, 0.45, 0.6),
-    (r"gear", "square", 6.0, 0.1, 0.6),
+    (r"gear|gang", "triangle", 36.0, 0.14, 0.86),
     (r"flag|status|warn|alarm|light|lamp|switch|state", "square", 12.0, 0.0, 1.0),
 ]
 
@@ -91,7 +92,7 @@ def profile_for(sig, choice_values: list[float] | None = None) -> Profile:
     for pattern, kind, period, f_lo, f_hi in _RULES:
         if re.search(pattern, text):
             return Profile(kind=kind, period=period, lo=lo + f_lo * span, hi=lo + f_hi * span,
-                           phase=phase, value=lo + f_lo * span)
+                           phase=phase, value=lo + f_lo * span, quantize=pattern.startswith("gear"))
     return Profile(kind="sine", period=10.0, lo=lo + 0.1 * span, hi=lo + 0.9 * span,
                    phase=phase, value=lo + 0.1 * span)
 
@@ -114,4 +115,5 @@ def evaluate(p: Profile, t: float) -> float:
         unit = 1.0 if x >= 0.5 else 0.0
     else:  # sine
         unit = 0.5 - 0.5 * math.cos(2.0 * math.pi * x)
-    return p.lo + unit * (p.hi - p.lo)
+    value = p.lo + unit * (p.hi - p.lo)
+    return float(round(value)) if p.quantize else value
