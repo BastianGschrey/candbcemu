@@ -7,7 +7,7 @@ from pathlib import Path
 import can
 import cantools
 
-from candbcemu.headless.patterns import evaluate, profile_for, signal_range
+from candbcemu.headless.patterns import Engine, evaluate, profile_for, signal_range
 from candbcemu.headless.sender import Sender
 from candbcemu.headless.web import make_server
 
@@ -22,23 +22,86 @@ class PatternTests(unittest.TestCase):
             for msg in db.messages:
                 for sig in msg.signals:
                     lo, hi = signal_range(sig)
-                    profile = profile_for(sig)
-                    for t in (0.0, 1.3, 7.7, 33.0, 123.4):
+                    profile = profile_for(sig, sim=Engine())
+                    for t in (0.0, 1.3, 7.7, 33.0, 123.4, 800.0):
                         v = evaluate(profile, t)
                         self.assertTrue(lo - 1e-6 <= v <= hi + 1e-6 or profile.kind == "choices",
                                         f"{path.name} {msg.name}.{sig.name}={v} not in {lo}..{hi}")
+
+
+class EngineTests(unittest.TestCase):
+    def test_drives_endlessly_and_consistently(self):
+        sim = Engine()
+        phases, gears, rpms, speeds = set(), set(), [], []
+        for i in range(0, 3 * 3600 * 2):                       # three hours in half-second steps
+            t = i * 0.5
+            sim.advance(t)
+            phases.add(sim.phase)
+            gears.add(sim.gear)
+            rpms.append(sim.rpm)
+            speeds.append(sim.v)
+            self.assertLessEqual(sim.rpm, 7300)
+            if sim.running and not sim.shift_left:
+                self.assertGreaterEqual(sim.rpm, 600)
+        self.assertEqual(phases, {"idle", "accel", "cruise", "decel"})
+        self.assertGreaterEqual(len(gears), 5)
+        self.assertGreater(max(speeds), 100)
+        self.assertLess(min(speeds), 1)                         # comes to a stop again and again
+        self.assertGreater(sum(1 for v in speeds if v < 1), 100)
+        self.assertGreater(sim.coolant, 85)                     # warm after a while ...
+        self.assertLess(sim.coolant, 110)                       # ... and held there
+
+    def test_modes(self):
+        sim = Engine()
+        for mode in Engine.MODES:
+            sim.set_mode(mode, 1000.0)
+            speeds, rpms = [], []
+            for i in range(0, 1800):                           # 15 minutes
+                sim.advance(1000.0 + i * 0.5)
+                speeds.append(sim.v)
+                rpms.append(sim.rpm)
+            if mode in ("start", "idle"):
+                self.assertEqual(max(speeds), 0.0, mode)       # never drives off
+            else:
+                self.assertGreater(max(speeds), 30, mode)
+            if mode == "idle":
+                self.assertGreater(sim.coolant, 88)            # warm from the beginning ...
+                tail = rpms[100:]
+                self.assertGreater(max(tail) - min(tail), 20)  # ... and the idle hunts a little
+                self.assertLess(max(tail) - min(tail), 250)
+            if mode == "start":
+                warming = Engine()
+                warming.set_mode("start", 0.0)
+                self.assertLess(warming.get("coolant", 10.0), warming.get("coolant", 200.0))   # warming up
+        self.assertFalse(sim.set_mode("nonsense"))
+
+    def test_cold_start_and_time_reset(self):
+        sim = Engine()
+        self.assertEqual(sim.get("rpm", 0.0), 0.0)
+        self.assertGreater(sim.get("rpm", 3.0), 0.0)
+        self.assertLess(sim.get("coolant", 3.0), 0.05)          # still cold
+        sim.get("coolant", 500.0)
+        self.assertEqual(sim.get("rpm", 0.0), 0.0)              # sender restarted: starts over
+
+    def test_names_are_matched_to_roles(self):
+        db = cantools.database.load_file(str(ROOT / "databases" / "emu_black.dbc"))
+        sim = Engine()
+        roles = {s.name: profile_for(s, sim=sim).role for m in db.messages for s in m.signals}
+        for name, role in (("RPM", "rpm"), ("VSPD", "speed"), ("GEAR", "gear"), ("CLT", "coolant"),
+                           ("TPS", "throttle"), ("LAMBDA", "lambda"), ("BATT", "volt"), ("AIN1", "")):
+            self.assertEqual(roles[name], role, name)
 
 
 class GearTests(unittest.TestCase):
     def test_gear_steps_through_whole_gears(self):
         db = cantools.database.load_file(str(ROOT / "databases" / "emu_black.dbc"))
         sig = next(s for m in db.messages for s in m.signals if s.name == "GEAR")
-        p = profile_for(sig)
-        values = [evaluate(p, t * 0.25) for t in range(0, 4 * 36)]
+        p = profile_for(sig, sim=Engine())
+        values = [evaluate(p, t * 0.25) for t in range(0, 4 * 600)]
         self.assertTrue(all(v == int(v) for v in values))
         self.assertGreaterEqual(len(set(values)), 5)          # climbs through several gears ...
         changes = sum(1 for a, b in zip(values, values[1:]) if a != b)
-        self.assertLess(changes, 20)                          # ... and does not flip back and forth
+        self.assertLess(changes, len(values) // 20)           # ... and does not flip back and forth
 
 
 class SenderTests(unittest.TestCase):
@@ -89,7 +152,7 @@ class SenderTests(unittest.TestCase):
         sender = Sender()
         sender.load_dbc(str(DBCS[0]))
         msg = sender.snapshot()["messages"][0]
-        sig = next(s for s in msg["signals"] if not s["selector"] and s["kind"] in ("sine", "triangle"))
+        sig = next(s for s in msg["signals"] if not s["selector"] and s["kind"] in ("engine", "sine", "triangle"))
         k, n = msg["key"], sig["name"]
         get = lambda: next(x for x in sender.snapshot()["messages"][0]["signals"] if x["name"] == n)
         span = sig["hi"] - sig["lo"]

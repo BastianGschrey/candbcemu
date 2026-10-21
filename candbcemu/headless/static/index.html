@@ -35,6 +35,12 @@
   <button id="conn" class="go">Starten</button>
   <button id="all">Alle an</button><button id="none">Alle aus</button>
 </header>
+<div class="status" id="modes" title="Ablauf der Motorsimulation">Simulation:
+  <button data-mode="complete" title="Kaltstart, Leerlauf, dann endlos fahren">Komplett</button>
+  <button data-mode="start" title="Kaltstart, danach Leerlauf (Motor wärmt sich auf)">Start</button>
+  <button data-mode="drive" title="Warmer Motor, endlos fahren">Fahren</button>
+  <button data-mode="idle" title="Warmer Leerlauf mit leicht schwankenden Werten">Konsistent</button>
+</div>
 <div class="status" id="status"></div>
 <main id="list"></main>
 <script>
@@ -51,6 +57,8 @@ $('conn').onclick = async () => {
   else await api('/api/connect', {interface:'socketcan', channel:$('channel').value, bitrate:+$('bitrate').value});
   refresh();
 };
+document.querySelectorAll('#modes button').forEach(b =>
+  b.onclick = async () => { await api('/api/mode', {mode:b.dataset.mode}); refresh(); });
 $('all').onclick = async () => { await api('/api/all', {enabled:true}); refresh(); };
 $('none').onclick = async () => { await api('/api/all', {enabled:false}); refresh(); };
 
@@ -118,6 +126,7 @@ async function refresh() {
   $('status').textContent = (state.running ? `Sendet auf ${state.interface}:${state.channel} @ ${state.bitrate}` : 'Gestoppt') + (state.log.length ? ' · ' + state.log[state.log.length-1] : '');
   const sig = x => x ? x.dbc + x.messages.length : '';
   if (!prev || sig(prev) !== sig(state)) build();
+  document.querySelectorAll('#modes button').forEach(b => b.style.outline = b.dataset.mode === state.mode ? '2px solid var(--orange)' : '');
   update();
 }
 refresh(); setInterval(() => { if (!dragging) refresh(); }, 1000);

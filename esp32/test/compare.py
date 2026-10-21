@@ -11,7 +11,13 @@ import cantools
 ROOT = Path(__file__).resolve().parents[2]
 BIN = Path("/tmp/claude-1000/host_encode")
 sys.path.insert(0, str(ROOT))
-from candbcemu.headless.patterns import signal_range  # noqa: E402
+from candbcemu.headless.patterns import Engine, evaluate, profile_for, signal_range  # noqa: E402
+
+# order of enum Role in dbc.h
+ROLES = ["rpm", "speed", "gear", "throttle", "pedal", "load", "inj", "map", "turbo", "coolant", "oilt", "egt",
+         "airt", "volt", "lambda", "oilp", "fuelp", "ign", "longg", "brakep", "brake", "clutch", "neutral",
+         "deccut", "fan", "ignsw", "baro"]
+KIND_SIM = 6
 
 
 def build():
@@ -40,6 +46,23 @@ def main():
                 plo, phi = signal_range(sig)
                 if abs(float(lo) - plo) > 1e-3 * max(1, abs(plo)) or abs(float(hi) - phi) > 1e-3 * max(1, abs(phi)):
                     print(f"RANGE {dbc.name} {msg.name}.{sig.name}: C++ {lo}..{hi} python {plo}..{phi}")
+                    bad += 1
+        # which signals follow the vehicle simulation, and with which range
+        sim = Engine()
+        for line in run(dbc, "roles"):
+            msg = db.get_message_by_frame_id(int(line[0], 16))
+            by_name = {x.name: x for x in msg.signals}
+            for item in line[1:]:
+                name, kind, role, lo, hi = item.rsplit(":", 4)
+                sig = by_name[name]
+                is_selector = sig.is_multiplexer
+                choices = [] if is_selector else [float(r) * sig.scale + sig.offset for r in sorted(sig.choices)] if sig.choices else []
+                p = profile_for(sig, choices, sim)
+                want_role = p.role if p.kind == "engine" else ""
+                got_role = ROLES[int(role)] if int(kind) == KIND_SIM else ""
+                if want_role != got_role or (want_role and (abs(float(lo) - p.lo) > 1e-3 * max(1, abs(p.lo))
+                                                           or abs(float(hi) - p.hi) > 1e-3 * max(1, abs(p.hi)))):
+                    print(f"ROLE {dbc.name} {msg.name}.{name}: C++ {got_role} {lo}..{hi} python {want_role} {p.lo}..{p.hi}")
                     bad += 1
         # frames
         for mode in ("min", "max", "mid"):

@@ -14,7 +14,7 @@ import can
 import cantools
 
 from ..dbc_utils import _message_key, _mux_selectors
-from .patterns import KINDS, Profile, evaluate, profile_for, signal_range
+from .patterns import KINDS, Engine, Profile, evaluate, profile_for, signal_range
 
 _MIN_CYCLE_MS = 5
 _MAX_CYCLE_MS = 3_600_000
@@ -64,6 +64,7 @@ class Sender:
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
         self._t0 = time.monotonic()
+        self._engine = Engine()
         self._config = self._read_config(config_path)
         self.interface = "socketcan"
         self.channel = "can0"
@@ -106,7 +107,7 @@ class Sender:
                     lo, hi = signal_range(sig)
                     is_selector = sig.name in state.selectors
                     choices = _signal_choices(sig) if not is_selector else []
-                    profile = profile_for(sig, choices)
+                    profile = profile_for(sig, choices, self._engine)
                     override = sig_cfg.get(sig.name, {})
                     for k in ("kind", "period", "lo", "hi", "phase", "value"):
                         if k in override:
@@ -152,6 +153,7 @@ class Sender:
             self._stop.clear()
             now = time.monotonic()
             self._t0 = now
+            self._engine.reset()          # key on: cold start again
             for state in self._messages.values():
                 state.next_due = now
             self._thread = threading.Thread(target=self._run, name="can-tx", daemon=True)
@@ -226,6 +228,11 @@ class Sender:
             self._stop.wait(max(0.001, wake - time.monotonic()))
 
     # ---- control (used by the web UI) ----
+    def set_mode(self, mode: str) -> bool:
+        """Scenario of the vehicle simulation (see Engine.MODES); restarts it."""
+        with self._lock:
+            return self._engine.set_mode(mode, time.monotonic() - self._t0)
+
     def set_all_enabled(self, enabled: bool) -> None:
         with self._lock:
             for state in self._messages.values():
@@ -285,6 +292,7 @@ class Sender:
                 "interface": self.interface,
                 "channel": self.channel,
                 "bitrate": self.bitrate,
+                "mode": self._engine.mode,
                 "log": list(self.log),
                 "messages": [
                     {

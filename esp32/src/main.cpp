@@ -186,6 +186,7 @@ static bool canStart(int bps, int mhz) {
     prefs.putInt("bitrate", bps);
     prefs.putInt("clock", mhz);
     startedAt = millis();
+    dbc::engine().reset();                    // key on: cold start again
     for (auto &m : db.messages) m.nextDue = startedAt;
     running = true;
     note("sendet mit " + String(bps / 1000) + " kbit/s (Quarz " + String(mhz) + " MHz)");
@@ -236,6 +237,7 @@ static const char *kindName(dbc::Signal::Kind k) {
         case dbc::Signal::Square: return "square";
         case dbc::Signal::Const: return "const";
         case dbc::Signal::Choices: return "choices";
+        case dbc::Signal::Sim: return "engine";
         default: return "manual";
     }
 }
@@ -266,6 +268,10 @@ static void handleState() {
     JsonDocument d;
     d["dbc"] = dbcName;
     d["running"] = running;
+    {
+        static const char *names[] = {"complete", "start", "drive", "idle"};
+        d["mode"] = names[dbc::engine().mode()];
+    }
     d["interface"] = "mcp2515";
     d["channel"] = "CS" + String(PIN_CS);
     d["bitrate"] = bitrate;
@@ -359,6 +365,21 @@ static void handleConnect() {
 }
 
 static void handleDisconnect() { canStop(); ok(); }
+
+static void handleMode() {
+    Lock lock;
+    JsonDocument b;
+    if (!bodyJson(b)) return sendError("bad request");
+    String mode = b["mode"] | "";
+    dbc::Engine::Mode m;
+    if (mode == "complete") m = dbc::Engine::Complete;
+    else if (mode == "start") m = dbc::Engine::Start;
+    else if (mode == "drive") m = dbc::Engine::Drive;
+    else if (mode == "idle") m = dbc::Engine::IdleOnly;
+    else return sendError("unknown mode");
+    dbc::engine().setMode(m, running ? (millis() - startedAt) / 1000.0 : 0.0);
+    ok();
+}
 
 static void handleAll() {
     Lock lock;
@@ -533,6 +554,7 @@ void setup() {
     server.on("/api/connect", HTTP_POST, handleConnect);
     server.on("/api/disconnect", HTTP_POST, handleDisconnect);
     server.on("/api/all", HTTP_POST, handleAll);
+    server.on("/api/mode", HTTP_POST, handleMode);
     server.on("/api/message", HTTP_POST, handleMessage);
     server.on("/api/signal", HTTP_POST, handleSignal);
     server.on("/api/firmware", HTTP_POST, fwDone, fwChunk);

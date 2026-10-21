@@ -49,6 +49,11 @@ Or use the launcher script from anywhere:
    **Show received frames** in the log header to mute it; on a very busy bus,
    excess frames are dropped from the log and reported as `RX overflow`.
 
+9. **Simulation** (row under the connection settings): *Komplett*, *Start*, *Fahren* and
+   *Konsistent* drive all signals with the same endless engine simulation as the headless
+   sender (see below); *Aus* switches it off. Moving a slider by hand pins that signal until
+   a mode is picked again.
+
 ### SocketCAN bitrate
 
 On Linux, a SocketCAN interface's bitrate is a property of the network link
@@ -106,10 +111,23 @@ not for talking to other tools or processes.
 Raspberry Pi 2B with a PiCAN2 as a test source for another CAN device. It needs only
 `cantools` and `python-can`.
 
-Every signal gets a curve from its range and its name/unit (engine speed swings quickly,
-temperatures drift slowly, enumerations step through their values, multiplexed messages
-cycle through their selector values). Values are limited to what the DBC range *and* the
-signal's bits can hold.
+Instead of plain sine waves, the signals of an engine follow one shared, endless vehicle
+simulation: cold start (cranking, fast idle), idle, pulling away, shifting through six
+gears, cruising, braking to a stop - and again, with random speeds and driving style. The
+values stay consistent: rpm follows speed and gear, throttle/load/boost follow the pedal,
+coolant and oil warm up slowly, lambda goes lean in overrun and rich under load, the
+brake/clutch/fan/decel-cut flags switch when they should. Signals are assigned by their
+name and unit (rpm, speed, gear, throttle/pedal, load, MAP/boost, coolant/oil/air/EGT
+temperature, oil/fuel pressure, lambda/AFR, battery voltage, ignition angle, injector duty,
+wheel speeds, ...); the simulated value is scaled into the signal's physical range
+(°C, Kelvin, kPa, bar, mph are recognised). All other signals get a curve from their range
+and name/unit (sine/triangle/square), enumerations step through their values, multiplexed
+messages cycle through their selector values. Values are limited to what the DBC range *and*
+the signal's bits can hold. The simulation restarts (cold engine) whenever sending starts. Four buttons in the web UI
+(`POST /api/mode`) choose the scenario: **Komplett** (cold start, then endless driving),
+**Start** (cold start, then idle only - the engine warms up), **Fahren** (warm engine, driving
+right away) and **Konsistent** (warm idle that never changes: rpm, lambda, voltage ... fluctuate
+slightly like a real idle).
 
 ```bash
 python3 -m candbcemu.headless --dbc emu_black.dbc --channel can0 --bitrate 500000 --auto
@@ -126,7 +144,8 @@ DBC, start/stop, switch messages on/off, change cycle times, and per signal eith
  "messages": {"ID_0x360": {"cycle": 20, "enabled": true}}}
 ```
 
-(`kind`: sine, triangle, square, const, choices, manual.)
+(`kind`: engine, sine, triangle, square, const, choices, manual - `engine` only makes sense for signals
+the simulation already drives; give any other signal a curve instead.)
 
 ### Raspberry Pi 2B + PiCAN2
 

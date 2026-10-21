@@ -74,6 +74,9 @@ def make_server(sender: Sender, dbc_dir: Path, port: int, host: str = "0.0.0.0")
                                  int(data.get("bitrate", 500000)), bool(data.get("setBitrate", True)))
                 elif path == "/api/disconnect":
                     sender.stop()
+                elif path == "/api/mode":
+                    if not sender.set_mode(str(data.get("mode", ""))):
+                        return self._json({"error": "unknown mode"}, 400)
                 elif path == "/api/all":
                     sender.set_all_enabled(bool(data.get("enabled")))
                 elif path == "/api/message":

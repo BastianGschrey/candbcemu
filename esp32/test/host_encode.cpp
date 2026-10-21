@@ -21,6 +21,12 @@ int main(int argc, char **argv) {
             printf("\n");
             continue;
         }
+        if (mode == "roles") {      // "<id hex> <signal>:<kind>:<role>:<lo>:<hi> ..." (parse() builds the profiles)
+            printf("%X", m.id);
+            for (auto &s : m.signals) printf(" %s:%d:%d:%.6g:%.6g", s.name.c_str(), (int)s.kind, (int)s.role, s.lo, s.hi);
+            printf("\n");
+            continue;
+        }
         for (auto &s : m.signals) {
             double lo = dbc::signalRangeLo(s), hi = dbc::signalRangeHi(s);
             s.value = mode == "min" ? lo : mode == "max" ? hi : (lo + hi) / 2;

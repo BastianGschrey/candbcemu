@@ -213,6 +213,38 @@ ApplicationWindow {
                     }
                 }
             }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Label { text: "Simulation" }
+                Repeater {
+                    model: [
+                        {mode: "off", label: "Aus", tip: "Keine Simulation: Werte nur per Hand"},
+                        {mode: "complete", label: "Komplett", tip: "Kaltstart, Leerlauf, dann endlos fahren"},
+                        {mode: "start", label: "Start", tip: "Kaltstart, danach Leerlauf (Motor wärmt sich auf)"},
+                        {mode: "drive", label: "Fahren", tip: "Warmer Motor, endlos fahren"},
+                        {mode: "idle", label: "Konsistent", tip: "Warmer Leerlauf mit leicht schwankenden Werten"}
+                    ]
+                    delegate: Button {
+                        required property var modelData
+                        text: modelData.label
+                        checkable: false
+                        highlighted: canController.simMode === modelData.mode
+                        ToolTip.text: modelData.tip
+                        ToolTip.visible: hovered
+                        onClicked: canController.setSimMode(modelData.mode)
+                    }
+                }
+                Label {
+                    visible: canController.simMode !== "off"
+                    text: "Ein Regler von Hand setzt das Signal fest, bis ein Modus neu gewählt wird."
+                    opacity: 0.6
+                    font.pixelSize: 11
+                }
+                Item { Layout.fillWidth: true }
+            }
         }
     }
 
@@ -244,6 +276,7 @@ ApplicationWindow {
                 required property bool transmitEnabled
                 required property string rawHex
                 required property var sigList
+                required property var liveValues
                 required property bool extended
 
                 property bool expanded: false
@@ -334,6 +367,10 @@ ApplicationWindow {
 
                                 property var sig: modelData
                                 property real curValue: sig.initial
+                                Binding on curValue {
+                                    when: canController.simMode !== "off" && msgCard.liveValues[sig.name] !== undefined
+                                    value: msgCard.liveValues[sig.name]
+                                }
 
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -351,6 +388,7 @@ ApplicationWindow {
                                 }
 
                                 Slider {
+                                    id: sigSlider
                                     objectName: "sigSlider"
                                     Layout.fillWidth: true
                                     visible: sig.choices.length === 0
@@ -358,6 +396,10 @@ ApplicationWindow {
                                     to: sig.maximum
                                     stepSize: sig.step > 0 ? sig.step : 0
                                     value: sig.initial
+                                    Binding on value {
+                                        when: canController.simMode !== "off" && !sigSlider.pressed
+                                        value: curValue
+                                    }
                                     onMoved: {
                                         curValue = value
                                         canController.setSignalValue(msgCard.msgId, sig.name, value)
@@ -365,11 +407,22 @@ ApplicationWindow {
                                 }
 
                                 ComboBox {
+                                    id: choiceBox
                                     Layout.fillWidth: true
                                     visible: sig.choices.length > 0
                                     model: sig.choices
                                     textRole: "name"
                                     valueRole: "value"
+                                    function indexOfNearest(v) {
+                                        var best = 0
+                                        for (var i = 1; i < sig.choices.length; i++)
+                                            if (Math.abs(sig.choices[i].value - v) < Math.abs(sig.choices[best].value - v)) best = i
+                                        return best
+                                    }
+                                    Binding on currentIndex {
+                                        when: canController.simMode !== "off" && !choiceBox.pressed && sig.choices.length > 0
+                                        value: choiceBox.indexOfNearest(curValue)
+                                    }
                                     Component.onCompleted: {
                                         for (var i = 0; i < sig.choices.length; i++) {
                                             if (Math.abs(sig.choices[i].value - sig.initial) < 1e-9) {

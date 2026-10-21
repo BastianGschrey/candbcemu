@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,6 +24,7 @@ from .dbc_utils import (
     _message_key,
     _mux_selectors,
 )
+from .headless.patterns import Engine, evaluate, profile_for
 from .net_utils import list_can_interfaces
 
 
@@ -38,6 +40,7 @@ _MAX_CYCLE_MS = 3_600_000
 
 _RX_QUEUE_MAX = 2000
 _RX_FLUSH_MS = 50
+_SIM_TICK_MS = 100
 _RX_LINES_PER_FLUSH = 100
 
 
@@ -75,6 +78,7 @@ class MessageListModel(QAbstractListModel):
     RawHexRole = Qt.UserRole + 8
     SigListRole = Qt.UserRole + 9
     ExtendedRole = Qt.UserRole + 10
+    LiveValuesRole = Qt.UserRole + 11
 
     _ROLE_NAMES = {
         NameRole: b"name",
@@ -87,6 +91,7 @@ class MessageListModel(QAbstractListModel):
         RawHexRole: b"rawHex",
         SigListRole: b"sigList",
         ExtendedRole: b"extended",
+        LiveValuesRole: b"liveValues",
     }
 
     _FIELD_BY_ROLE = {
@@ -100,6 +105,7 @@ class MessageListModel(QAbstractListModel):
         RawHexRole: "raw_hex",
         SigListRole: "sig_list",
         ExtendedRole: "extended",
+        LiveValuesRole: "live_values",
     }
 
     def __init__(self, parent=None):
@@ -148,6 +154,7 @@ class CanController(QObject):
     busyChanged = Signal()
     vcanCreated = Signal(str)
     vcanFailed = Signal(str)
+    simModeChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -164,6 +171,15 @@ class CanController(QObject):
         self._rx_timer = QTimer(self)
         self._rx_timer.setInterval(_RX_FLUSH_MS)
         self._rx_timer.timeout.connect(self._flush_rx)
+        # vehicle simulation: drives the signals like the headless sender does
+        self._sim_mode = "off"
+        self._engine = Engine()
+        self._profiles: dict[int, list] = {}       # msg_id -> [(signal name, Profile)]
+        self._pinned: set = set()                   # (msg_id, signal) set by hand while simulating
+        self._sim_t0 = 0.0
+        self._sim_timer = QTimer(self)
+        self._sim_timer.setInterval(_SIM_TICK_MS)
+        self._sim_timer.timeout.connect(self._sim_tick)
 
     # -- properties ---------------------------------------------------
     @Property(QObject, constant=True)
@@ -177,6 +193,10 @@ class CanController(QObject):
     @Property(str, notify=dbcLoaded)
     def dbcName(self):
         return self._dbc_name
+
+    @Property(str, notify=simModeChanged)
+    def simMode(self):
+        return self._sim_mode
 
     @Property(bool, notify=busyChanged)
     def busy(self):
@@ -208,10 +228,13 @@ class CanController(QObject):
         self._stop_all_periodic()
         self._db = db
         self._tx_states = {}
+        self._profiles = {}
+        self._pinned = set()
         rows = []
         for msg in sorted(db.messages, key=lambda m: m.frame_id):
             values = {}
             sig_list = []
+            profiles = []
             mux_ids = _mux_selectors(msg)
             for sig in msg.signals:
                 minimum, maximum = _effective_range(sig)
@@ -239,6 +262,8 @@ class CanController(QObject):
                 if choice_values and not any(abs(initial - v) < 1e-9 for v in choice_values):
                     initial = choice_values[0]
                 values[sig.name] = initial
+                if sig.name not in mux_ids:
+                    profiles.append((sig.name, profile_for(sig, choice_values, self._engine)))
                 sig_list.append({
                     "name": sig.name,
                     "unit": sig.unit or "",
@@ -261,7 +286,9 @@ class CanController(QObject):
                 "raw_hex": "",
                 "sig_list": sig_list,
                 "extended": bool(msg.is_extended_frame),
+                "live_values": dict(values),
             })
+            self._profiles[_message_key(msg)] = profiles
             self._tx_states[_message_key(msg)] = TxState(message=msg, values=values)
 
         self._model.reset(rows)
@@ -269,6 +296,8 @@ class CanController(QObject):
             self._refresh_raw_hex(row_idx)
 
         self._dbc_name = Path(local_path).name
+        if self._sim_mode != "off":
+            self.setSimMode(self._sim_mode)
         self.dbcLoaded.emit(self._dbc_name, len(rows))
         self.logMessage.emit(f"Loaded {self._dbc_name}: {len(rows)} messages")
         return True
@@ -393,7 +422,52 @@ class CanController(QObject):
         if state is None:
             return
         state.values[signal_name] = value
+        if self._sim_mode != "off":
+            self._pinned.add((msg_id, signal_name))        # set by hand: the simulation leaves it alone
+        self._publish_values(msg_id)
         self._reencode(msg_id, push_to_task=True)
+
+    # -- vehicle simulation ----------------------------------------------
+    @Slot(str)
+    def setSimMode(self, mode: str):
+        """"off" or one of Engine.MODES; restarts the simulation and releases hand-set signals."""
+        self._pinned = set()
+        if mode == "off":
+            self._sim_timer.stop()
+            self._sim_mode = "off"
+        elif self._engine.set_mode(mode, 0.0):
+            self._sim_t0 = time.monotonic()
+            self._sim_mode = mode
+            self._sim_timer.start()
+            self._sim_tick()
+        else:
+            return
+        self.simModeChanged.emit()
+        self.logMessage.emit("Simulation: " + ("off" if mode == "off" else mode))
+
+    def _publish_values(self, msg_id: int):
+        row = self._model.find_row_by_id(msg_id)
+        state = self._tx_states.get(msg_id)
+        if row >= 0 and state is not None:
+            self._model.update_field(row, "live_values", dict(state.values), MessageListModel.LiveValuesRole)
+
+    def _sim_tick(self):
+        t = time.monotonic() - self._sim_t0
+        for msg_id, profiles in self._profiles.items():
+            state = self._tx_states.get(msg_id)
+            if state is None:
+                continue
+            changed = False
+            for name, profile in profiles:
+                if (msg_id, name) in self._pinned:
+                    continue
+                value = evaluate(profile, t)
+                if value != state.values.get(name):
+                    state.values[name] = value
+                    changed = True
+            if changed:
+                self._publish_values(msg_id)
+                self._reencode(msg_id, push_to_task=True)
 
     @Slot(int, int)
     def setCycleTime(self, msg_id: int, milliseconds: int):

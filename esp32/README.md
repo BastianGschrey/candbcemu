@@ -1,8 +1,12 @@
 # ESP32 CAN demo sender (MCP2515)
 
 Same idea as `candbcemu.headless`, but on an ESP32 with an MCP2515 module: upload a `.dbc` in the
-browser, the firmware sends demo data for every message (curves chosen per signal from its range,
-name and unit), with per-signal override sliders.
+browser, the firmware sends demo data for every message (engine signals - rpm, speed, gear, throttle,
+temperatures, boost, lambda ... - follow an endless vehicle simulation: start, idle, pull away, shift,
+cruise, brake, stop, repeat; other signals get a curve chosen from range, name and unit), with
+per-signal override sliders. The simulation restarts when sending is started. The buttons Komplett / Start / Fahren / Konsistent
+choose the scenario (cold start + driving, cold start + idle, warm + driving, warm idle with slightly
+fluctuating values).
 
 ## Wiring
 

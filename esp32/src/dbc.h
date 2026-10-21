@@ -1,4 +1,4 @@
-// Minimal DBC reader + frame encoder + demo value curves. Plain C++ (no Arduino), so it can be
+// Minimal DBC reader + frame encoder + demo values (curves and an endless engine simulation). Plain C++ (no Arduino), so it can be
 // tested on the PC against cantools (see test/).
 #pragma once
 #include <cstdint>
@@ -7,6 +7,51 @@
 #include <vector>
 
 namespace dbc {
+
+// Quantities of the simulated vehicle that signals can follow (by name, see buildProfiles).
+enum Role {
+    R_NONE = -1, R_RPM, R_SPEED, R_GEAR, R_THROTTLE, R_PEDAL, R_LOAD, R_INJ, R_MAP, R_TURBO, R_COOLANT,
+    R_OILT, R_EGT, R_AIRT, R_VOLT, R_LAMBDA, R_OILP, R_FUELP, R_IGN, R_LONGG, R_BRAKEP, R_BRAKE,
+    R_CLUTCH, R_NEUTRAL, R_DECCUT, R_FAN, R_IGNSW, R_BARO, R_COUNT
+};
+
+// Endless vehicle simulation: cold start, idle, pulling away, shifting, cruising, braking to a
+// stop, and again. get() returns a quantity as 0..1 of its reference range; the simulation
+// advances by itself to the requested time. Same model as Engine in candbcemu/headless/patterns.py.
+class Engine {
+public:
+    Engine() { reset(); }
+    // Scenarios: cold start + driving, cold start + idle only, warm + driving, warm idle (stays at idle).
+    enum Mode { Complete, Start, Drive, IdleOnly };
+    Mode mode() const { return mode_; }
+    void setMode(Mode m, double t) { mode_ = m; reset(t); }   // and start it over at time t
+    void reset(double t = 0.0);
+    double get(Role role, double t);
+
+private:
+    void step(double dt);
+    void drive(double dt);
+    void nextPhase();
+    void publish();
+    double rnd();                       // 0..1
+    double gauss(double sd);
+    uint32_t seed_ = 7;
+    Mode mode_ = Complete;
+    double t0_ = 0;
+
+    enum Phase { Idle, Accel, Cruise, Decel };
+    double t_ = 0;
+    bool running_ = false;
+    double rpm_ = 0, v_ = 0;
+    int gear_ = 1;
+    double shiftLeft_ = 0, pedal_ = 0, thr_ = 0, acc_ = 0;
+    bool brake_ = false;
+    Phase phase_ = Idle;
+    double phaseLeft_ = 4, target_ = 0, aggr_ = 0.7;
+    double load_ = 0, map_ = 0, coolant_ = 20, oil_ = 20, egt_ = 120, air_ = 20, lam_ = 0.5, wobble_ = 0;
+    bool fan_ = false, cut_ = false;
+    double q_[R_COUNT] = {0};
+};
 
 struct Signal {
     std::string name;
@@ -22,8 +67,9 @@ struct Signal {
     std::vector<std::pair<long, std::string>> choices;   // raw value -> text
 
     // ---- demo curve state (filled by buildProfiles) ----
-    enum Kind { Sine, Triangle, Square, Const, Choices, Manual };
+    enum Kind { Sine, Triangle, Square, Const, Choices, Manual, Sim };
     Kind kind = Sine, autoKind = Sine;
+    Role role = R_NONE;                      // kind Sim: the simulated quantity that drives the signal
     double period = 10.0, lo = 0.0, hi = 1.0, phase = 0.0, manual = 0.0;
     bool quantize = false;                   // whole numbers only (gear): the curve steps
     double defLo = 0.0, defHi = 1.0;         // the automatic min/max, to go back to
@@ -60,6 +106,9 @@ bool parse(const std::string &text, Database &db, std::string &error);
 
 // Chooses a demo curve for every signal (from range, name and unit) and the hard limits.
 void buildProfiles(Database &db);
+
+// The shared vehicle simulation; reset it when sending starts (key on).
+Engine &engine();
 
 // Value of the signal's curve at time t (seconds).
 double evaluate(const Signal &s, double t);
