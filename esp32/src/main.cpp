@@ -56,9 +56,10 @@ static void note(const String &s) {
     Serial.println(s);
 }
 
-// ---------------------------------------------------------------- saved min/max (per DBC)
-// The automatic min/max of every signal that differs from the default is kept in /cfg/<dbc>.json
-// and applied again whenever that DBC is loaded (so it survives a restart).
+// ---------------------------------------------------------------- saved settings (per DBC)
+// Kept in /cfg/<dbc>.json and applied again whenever that DBC is loaded (so they survive a restart):
+//   signals: the automatic min/max of every signal that differs from the default
+//   enabled: the ids (hex) of the messages switched on; without the key (older files) all stay off
 static bool cfgDirty = false;
 static unsigned long cfgDirtyAt = 0;
 
@@ -83,8 +84,15 @@ static void saveCfg() {
                 e["lo"] = s.lo;
                 e["hi"] = s.hi;
             }
+    JsonArray en = d["enabled"].to<JsonArray>();
+    for (auto &m : db.messages)
+        if (m.enabled) {
+            char id[12];
+            snprintf(id, sizeof id, "%X", (unsigned)m.id);
+            en.add(id);
+        }
     String path = cfgPath(dbcName);
-    if (sigs.size() == 0) { LittleFS.remove(path); return; }
+    if (sigs.size() == 0 && en.size() == 0) { LittleFS.remove(path); return; }
     File f = LittleFS.open(path, "w");
     if (f) { serializeJson(d, f); f.close(); }
 }
@@ -109,6 +117,15 @@ static void applyCfg() {
             if (hi < lo) hi = lo;
             s.lo = lo;
             s.hi = hi;
+        }
+    JsonArray en = d["enabled"];
+    if (!en.isNull())
+        for (auto &m : db.messages) {
+            char id[12];
+            snprintf(id, sizeof id, "%X", (unsigned)m.id);
+            m.enabled = false;
+            for (JsonVariant v : en)
+                if (strcmp(v | "", id) == 0) { m.enabled = true; break; }
         }
 }
 
@@ -361,10 +378,15 @@ static void handleConnect() {
     int bps = b["bitrate"] | 500000;
     int mhz = b["clock"] | clockMHz;
     if (!canStart(bps, mhz)) return sendError(logLine, 500);
+    prefs.putBool("autostart", true);         // after a restart: send again without pressing "Verbinden"
     ok();
 }
 
-static void handleDisconnect() { canStop(); ok(); }
+static void handleDisconnect() {
+    canStop();
+    prefs.putBool("autostart", false);
+    ok();
+}
 
 static void handleMode() {
     Lock lock;
@@ -387,6 +409,7 @@ static void handleAll() {
     if (!bodyJson(b)) return sendError("bad request");
     bool en = b["enabled"] | false;
     for (auto &m : db.messages) m.enabled = en;
+    markCfgDirty();
     ok();
 }
 
@@ -397,7 +420,7 @@ static void handleMessage() {
     size_t key = b["key"] | -1;
     if (key >= db.messages.size()) return sendError("unknown message", 404);
     auto &m = db.messages[key];
-    if (!b["enabled"].isNull()) { m.enabled = b["enabled"]; m.nextDue = millis(); }
+    if (!b["enabled"].isNull()) { m.enabled = b["enabled"]; m.nextDue = millis(); markCfgDirty(); }
     if (!b["cycle"].isNull()) m.cycleMs = constrain((int)b["cycle"], 5, 3600000);
     ok();
 }
@@ -544,6 +567,9 @@ void setup() {
     SPI.begin(PIN_SCK, PIN_MISO, PIN_MOSI, PIN_CS);
     String last = prefs.getString("dbc", "");
     if (!last.isEmpty()) loadDbc(last);
+    // Was it sending before the restart (power cut, firmware update)? Then start again right away, with the
+    // messages that were switched on (kept per DBC in /cfg).
+    if (prefs.getBool("autostart", false) && !db.messages.empty()) canStart(bitrate, clockMHz);
     startWifi();
 
     server.on("/", HTTP_GET, handleRoot);
